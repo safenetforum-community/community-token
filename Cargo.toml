@@ -1,0 +1,8 @@
+[package]
+name = "community-token"
+version = "0.0.1"
+description = "Autonomi Community Token"
+edition = "2021"
+
+[dependencies]
+autonomi = { version = "0.4.3" }
