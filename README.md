@@ -6,15 +6,25 @@
 4. Bridge smart contract to burn tokens on Arbitrum side, with option to updgrade for 2-way operation
 5. Simple exchange scheme for different tokens
 
-* [Daily updates](https://github.com/safenetforum-community/community-token/discussions/1)
-
 ## [Proposal @Autonomi Forum](https://forum.autonomi.community/t/community-token-proposal/41585)
 
 * Proposal announcement
 * Weekly updates
 * Discussion
 
-[GitHub project](https://github.com/orgs/safenetforum-community/projects/2)
+## [GitHub project](https://github.com/orgs/safenetforum-community/projects/2)
 
 * Roadmap
 * Progress Tracking
+
+## [Daily updates](https://github.com/safenetforum-community/community-token/discussions/1)
+
+## Background
+
+Autonomi community has expressed a need for a native token format multiple times. David Irvine, and other members shared their ideas on Autonomi Forum. This project takes these ideas and aims for developing a standard for transacting on the network. It will enable issuing own token by anyone – from scratch, or by wrapping existing ERC20 tokens from Arbitrum network. Ability to exchange one tokens for others in a completely decentralized way is also planned.
+
+## Target audience
+
+"Ordinary people – the wallet will be as simple as possible and let people transact easily.
+Crypto crowd and traders – will be able to exchange their favorite tokens on Autonomi.
+Developers – they will be able to integrate currency into their own projects."
