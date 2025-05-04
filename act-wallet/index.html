@@ -12,9 +12,18 @@
     <main class="container">
       <h1>Autonomi Community Token</h1>
 
-      <p>Provide a local testnet node Multiaddr, or just leave it empty if you want to connect to Mainnet</p>
-      <input id="peer-input" placeholder="Local testnet Multiaddr..." />
-      <button id="connect-button" type="button">Connect</button>
+      <div id="connect">
+        <p>
+          Provide a private key on EVM (Arbitrum/Sepolia/Local) network. Leave it empty to generate random account for you.
+        </p>
+        <p>
+          <input id="pk-input" placeholder="EVM private key..." value="0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80" size=80 />
+        </p>
+        <p>
+          <button id="main-connect-button" type="button">Connect Mainnet</button>
+          <button id="local-connect-button" type="button">Connect Local Testnet</button>
+        </p>
+      </div>
 
     </main>
   </body>

@@ -1,20 +1,29 @@
 import { invoke } from "@tauri-apps/api/core";
 
-let peerInputEl: HTMLInputElement | null;
+let pkInputEl: HTMLInputElement | null;
 
-async function connect() {
-  if (peerInputEl) {
-    const peer = peerInputEl.value || null;
+async function connect(local: boolean) {
+  if (pkInputEl) {
+    const pk = pkInputEl.value || null;
     console.log("Connecting Autonomi...");
     await invoke("connect", {
-      peer: peer,
+      local: local,
+      evmPk: pk,
     });
     console.log("Connected.");
+
+    let balance = await invoke("balance");
+    let balanceEl = document.createElement("p");
+    balanceEl.innerHTML = "Balance: " + balance;
+
+    document.getElementById("connect").after(balanceEl);
+    document.getElementById("connect").hidden = true;
   }
 }
 
 window.addEventListener("DOMContentLoaded", () => {
-  peerInputEl = document.querySelector("#peer-input");
+  pkInputEl = document.querySelector("#pk-input");
 
-  document.querySelector("#connect-button")?.addEventListener("click", (e) => connect());
+  document.querySelector("#main-connect-button")?.addEventListener("click", (e) => connect(false));
+  document.querySelector("#local-connect-button")?.addEventListener("click", (e) => connect(true));
 });
