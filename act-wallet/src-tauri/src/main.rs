@@ -2,5 +2,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-    act_wallet_lib::run()
+	act_wallet_lib::run()
 }

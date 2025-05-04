@@ -1,22 +1,20 @@
 import { invoke } from "@tauri-apps/api/core";
 
-let greetInputEl: HTMLInputElement | null;
-let greetMsgEl: HTMLElement | null;
+let peerInputEl: HTMLInputElement | null;
 
-async function greet() {
-  if (greetMsgEl && greetInputEl) {
-    // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-    greetMsgEl.textContent = await invoke("greet", {
-      name: greetInputEl.value,
+async function connect() {
+  if (peerInputEl) {
+    const peer = peerInputEl.value || null;
+    console.log("Connecting Autonomi...");
+    await invoke("connect", {
+      peer: peer,
     });
+    console.log("Connected.");
   }
 }
 
 window.addEventListener("DOMContentLoaded", () => {
-  greetInputEl = document.querySelector("#greet-input");
-  greetMsgEl = document.querySelector("#greet-msg");
-  document.querySelector("#greet-form")?.addEventListener("submit", (e) => {
-    e.preventDefault();
-    greet();
-  });
+  peerInputEl = document.querySelector("#peer-input");
+
+  document.querySelector("#connect-button")?.addEventListener("click", (e) => connect());
 });
