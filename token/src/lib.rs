@@ -132,13 +132,26 @@ mod tests {
 		};
 
 		println!("Wallet: {:?}", wallet);
-		
 
-		// TODO: check balance on that key
+		// TODO: save wallet to scratchpad
+
+
+		// check balance on that key
+
+		let tx = client.graph_entry_get(&GraphEntryAddress::new(*genesis_address.owner()))
+			.await.map_err(|e| format!("{}", e))?;
+		let (balance, overflow) = tx.descendants.iter()
+			.filter(|(pubkey, data)| pubkey == &issuer_key)
+			.map(|(pubkey, data)| U256::from_be_bytes(*data))
+			.fold((U256::from(0), false), |(sum, any_overflow), n| {
+				let (sum, this_overflow) = sum.overflowing_add(n);
+				(sum, any_overflow || this_overflow)
+			});
+		
+		println!("ACT Token issuer Balance: {}", balance);
+		assert_eq!(total_supply, balance)
 
 		// TODO: create a spend transaction to a second key
-
-		// TODO: check balance on a second key
 
 		Ok(())
 	}
