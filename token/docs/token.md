@@ -10,11 +10,12 @@ We begin with creating lib/application for Autonomi, not icluding changes to API
 
 Each graph is a separate token.
 
-Token ID is a xorname (public key?) of the structure (Chunk?) containing token info: *symbol*, *name*, *totalSupply*, *decimals*. Future Native Token could have token ID consisting of zeros and token info would be hardcoded.
+Token ID is a xorname of the Chunk containing token info: *symbol*, *name*, *decimals*. Future Native Token could have token ID consisting of zeros and token info would be hardcoded.
 
 Genesis transaction GE:
 * *content* token ID, as in ordinary GE
 * Empty *parents* (indicating a genesis transaction)
+* Single *output* to issuer's key. This value is a *totalSupply*.
 
 ## Bridged (ERC20)
 
@@ -24,7 +25,7 @@ Token ID is a hash/derivation of EVM token address. TODO: or maybe first bridge 
 
 Genesis transaction GE:
 * *content* is a burn transaction ID on the blockchain
-* Single *parents* entry, pointing to the GE itself, as a marker of Bridged genesis transaction.
+* Single *parents* entry, pointing to the GE itself (or zero?), as a marker of Bridged genesis transaction.
 
 ## Common (Native / Bridged)
 

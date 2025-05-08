@@ -5,4 +5,20 @@ description = "Autonomi Community Token"
 edition = "2021"
 
 [dependencies]
-autonomi = { version = "0.4.3" }
+serde_json = "1"
+serde = { version = "1", features = ["derive"] }
+#rand = "*"
+#rand_chacha = "*"
+#blsttc = "8"
+ruint = "1"
+#evmlib = "0.3"
+sn_bls_ckd = "0.2"
+sn_curv = { version = "0.10", default-features = false, features = ["num-bigint"] }
+tracing = "*"
+ant-logging = "*"
+autonomi = { version = "=0.4.5" }
+#autonomi = { version = "0.4" }
+
+[dev-dependencies]
+tokio = "1"
+hex = "0.4"
