@@ -31,11 +31,15 @@ This project is also funded by community. If the project gets any prize, support
 
 ## Why it's also important (aka Native Token)
 
-Most community members see Native Token as a crucial part of the network design, it's initial fundamental properties.
+Many community members see Native Token as a crucial part of the network design, it's initial fundamental properties.
 
-After ECR20-ANT aka Network Token launch together with current network, MaidSafe team has mentioned NT, but there are no official plans, no roadmap. And instead, we have suggestions from David, that it should be done by community, and MaidSafe is continuing to using Blockchain everywhere they can (IF program, stakeholder NTFs).
+MaidSafe is constrained to using Blockchain everywhere (IF program, stakeholder NTFs) because that is the only mechanism that is currently reliably operational. Community Network Token aims to address that failing ASAP consistent with security and reliability.
 
-The best we can do is to try ourselves, and perhaps MaidSafe will follow. We all have faith, that at this stage of project's advancement, if they planned to work on competitive technology for Native Token in near future, they would tell us, so that we would not waste the time and resources. Said that, it looks like this project is the way to Native Token in a situation, where the future is uncertain.
+After tha launch of ECR20-ANT aka Network Token, together with current network, MaidSafe team has mentioned they will work on NT, but on the other hand there still is no roadmap, and David suggests, that it should be done by community.
+
+The best we can do is to try ourselves, and perhaps MaidSafe will follow. We all have faith, that at this stage of project's advancement, if they planned to work on competitive technology for Native Token in near future, they would tell us, so that we would not waste the time and resources.
+
+Said that, it looks like this project is the way to Native Token in this situation.
 
 ## Target audience
 
