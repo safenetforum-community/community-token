@@ -1,5 +1,5 @@
 [package]
-name = "community-token"
+name = "ant-act"
 version = "0.0.1"
 description = "Autonomi Community Token"
 edition = "2021"
