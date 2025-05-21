@@ -1,10 +1,12 @@
 use std::fmt;
-use ruint::aliases::U256;
 use std::collections::HashMap;
-use autonomi::{SecretKey, Client, PublicKey, client::payment::PaymentOption, XorName, Chunk, Bytes, GraphEntry};
+use futures::{stream, StreamExt, future::Future};
 use serde::{Serialize, Deserialize, Serializer, Deserializer,
 	de::{Visitor, MapAccess, value::MapAccessDeserializer}
 };
+use ruint::aliases::U256;
+use sn_curv::elliptic::curves::ECScalar;
+use autonomi::{SecretKey, Client, PublicKey, client::payment::PaymentOption, XorName, Chunk, Bytes, GraphEntry, GraphEntryAddress};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct TokenInfo {
@@ -49,6 +51,65 @@ impl Wallet {
 		};
 		// TODO: validate
 	}
+
+	pub fn balance_total(&self) -> Result<U256, String> {
+
+		let (balance, overflow) = self.1.iter()
+			.fold((U256::from(0), false), |(sum, any_index_overflow), (_index, spends)| {
+				let (spends_sum, spends_overflow) = spends.iter()
+					.fold((U256::from(0), false), |(sum, any_spend_overflow), (_spend, amount)| {
+						let (added, this_spend_overflow) = sum.overflowing_add(*amount);
+						(added, any_spend_overflow || this_spend_overflow)
+					});
+				let (added, this_index_overflow) = sum.overflowing_add(spends_sum);
+				(added, any_index_overflow || spends_overflow || this_index_overflow)
+			});
+
+		match overflow {
+			false => Ok(balance),
+			true => Err("Overflow.".into()),
+		}
+	}
+
+	pub fn balance(&self, index: DerivationIndex) -> Result<U256, String> {
+
+		let spends = match self.1.get(&index) {
+			None => {
+				return Ok(U256::ZERO);
+			},
+			Some(spends) => spends
+		};
+
+		let (balance, overflow) = spends.iter()
+			.fold((U256::from(0), false), |(sum, any_overflow), (_spend, amount)| {
+				let (added, this_overflow) = sum.overflowing_add(*amount);
+				(added, any_overflow || this_overflow)
+			});
+
+		match overflow {
+			false => Ok(balance),
+			true => Err("Overflow.".into()),
+		}
+	}
+
+	pub fn unspent_outputs(&self, index: DerivationIndex) -> Result<(Vec<PublicKey>, U256), String> {
+		let (outputs, sum, overflow) = self.1.get(&index).unwrap_or(&Vec::new()).iter()
+			.fold(
+				(Vec::<PublicKey>::new(), U256::from(0), false),
+				|(mut outputs, sum, any_overflow), (output, amount)| {
+					println!("Ipnut: {:?}", (output, amount));
+					let (sum, this_overflow) = sum.overflowing_add(*amount);
+					outputs.push(*output);
+					(outputs, sum, any_overflow || this_overflow)
+				}
+			);
+
+		match overflow {
+			false => Ok((outputs, sum)),
+			true => Err("Overflow.".into()),
+		}
+	}
+
 
 //	pub fn find(&self, request: PublicKey) -> DerivationIndex {
 //		// TODO: find index by deriving and comparing with all available indexes
@@ -102,7 +163,7 @@ impl WalletExt for Client {
 
 
 #[derive(Clone, Hash, Eq, PartialEq, Debug, Serialize, Deserialize)]
-pub struct DerivationIndex(Vec<u8>);
+pub struct DerivationIndex(Vec<u8>); // TODO: make this private and change functions attributes to Vec<u8>
 
 
 pub trait ActExt {
@@ -114,7 +175,12 @@ pub trait ActExt {
 		total_supply: U256,
 		issuer_key: PublicKey,
 		payment: &PaymentOption,
-	) -> impl std::future::Future<Output = Result<(PublicKey, XorName), String>> + Send;
+	) -> impl Future<Output = Result<(PublicKey, XorName), String>> + Send;
+
+	fn unspent(&self, pubkey: &PublicKey, spend: PublicKey) -> impl Future<Output = Result<U256, String>> + Send;
+
+	fn act_balance(&self, pubkey: PublicKey, spends: Vec<PublicKey>) -> impl Future<Output = Result<U256, String>> + Send;
+
 }
 
 impl ActExt for Client {
@@ -125,16 +191,18 @@ impl ActExt for Client {
 		symbol: String,
 		decimals: u8,
 		total_supply: U256,
-		issuer_key: PublicKey,
+		to: PublicKey,
 		payment: &PaymentOption,
 	) -> Result<(PublicKey, XorName), String> {
 
 		// create token info chunk
-		let token_info = Chunk::new(Bytes::from(serde_json::to_string(&TokenInfo {
+		let token_info_bytes = Bytes::from(serde_json::to_string(&TokenInfo {
 			name,
 			symbol,
 			decimals,
-		}).map_err(|e| format!("{}", e))?));
+		}).map_err(|e| format!("{}", e))?);
+
+		let token_info = Chunk::new(token_info_bytes.clone());
 		let (_paid, token_info_address) = self.chunk_put(&token_info, payment.clone())
 			.await.map_err(|e| format!("{}", e))?;
 
@@ -145,13 +213,17 @@ impl ActExt for Client {
 
 		// create genesis tx with output to given key
 
-		let genesis_owner = SecretKey::random();
+		let genesis_owner = SecretKey::from_bytes(sn_bls_ckd::derive_master_sk(
+			&XorName::from_content(&token_info_bytes).0
+		).expect("Wrong bytes").serialize().into()).expect("Wrong bytes");
+		println!("Genesis owner: {:?}", genesis_owner);
+
 		let genesis_owner_pubkey = genesis_owner.public_key();
 		let genesis = GraphEntry::new(
 			&genesis_owner,
 			vec![],
 			token_id.0.clone(),
-			vec![(issuer_key, total_supply.to_be_bytes())] // all output to issuer
+			vec![(to, total_supply.to_be_bytes())] // all output to issuer
 		);
 		let (_paid, genesis_address) = self.graph_entry_put(genesis, payment.clone())
 			.await.map_err(|e| format!("{}", e))?;
@@ -163,14 +235,46 @@ impl ActExt for Client {
 
 		Ok((genesis_spend, *token_id))
 	}
+
+	async fn unspent(&self, pubkey: &PublicKey, spend: PublicKey) -> Result<U256, String> {
+
+		let tx = self.graph_entry_get(&GraphEntryAddress::new(spend))
+			.await.map_err(|e| format!("{}", e))?;
+
+		let (balance, overflow) = tx.descendants.iter()
+			.filter(|(pk, _data)| pk == pubkey)
+			.map(|(_pk, data)| U256::from_be_bytes(*data))
+			.fold((U256::from(0), false), |(sum, any_overflow), n| {
+				let (added, this_overflow) = sum.overflowing_add(n);
+				(added, any_overflow || this_overflow)
+			});
+
+		match overflow {
+			false => Ok(balance),
+			true => Err("Overflow.".into()),
+		}
+	}
+
+	async fn act_balance(&self, pubkey: PublicKey, spends: Vec<PublicKey>) -> Result<U256, String>
+	{
+		let stream = stream::iter(spends);
+
+		stream.fold(Ok(U256::from(0)), |sum_res, spend_pk| async move {
+			let unsp = self.unspent(&pubkey, spend_pk).await?;
+
+			match sum_res?.overflowing_add(unsp) {
+				(added, false) => Ok(added),
+				(_, true) => Err("Overflow.".into()),
+			}
+		}).await
+	}
 }
 
 
 
 #[cfg(test)]
 mod tests {
-	use sn_curv::elliptic::curves::ECScalar;
-	use autonomi::{Wallet as EvmWallet, GraphEntryAddress};
+	use autonomi::{Wallet as EvmWallet};
 	use tracing::Level;
 	use super::*;
 
@@ -238,6 +342,7 @@ mod tests {
 			hex::decode(EVM_PK).map_err(|e| format!("{}", e))?[0..32].try_into().unwrap()
 		).expect("Wrong bytes").serialize().into()).expect("Wrong bytes");
 
+		// TODO: read wallet from scratchpad
 
 		let mut wallet = Wallet::new(sk.clone());
 		let issuer_index = DerivationIndex(vec![1]);
@@ -264,19 +369,14 @@ mod tests {
 
 		// check balance on that key
 
-		let tx = client.graph_entry_get(&GraphEntryAddress::new(genesis_spend))
-			.await.map_err(|e| format!("{}", e))?;
-		let (balance, overflow) = tx.descendants.iter()
-			.filter(|(pubkey, _data)| pubkey == &issuer_key)
-			.map(|(_pubkey, data)| U256::from_be_bytes(*data))
-			.fold((U256::from(0), false), |(sum, any_overflow), n| {
-				let (sum, this_overflow) = sum.overflowing_add(n);
-				(sum, any_overflow || this_overflow)
-			});
+		let balance_validation = client.act_balance(issuer_key, vec![genesis_spend]).await?;
 		
-		println!("ACT Token issuer Balance: {}", balance);
-		assert!(!overflow); // TODO: error/result
-		assert_eq!(total_supply, balance);
+		println!("ACT Token issuer Balance: {}", balance_validation);
+//		assert!(!overflow); // TODO: error/result
+		assert_eq!(total_supply, balance_validation);
+//		assert_eq!(total_supply, wallet.balance_total());
+		assert_eq!(total_supply, wallet.balance(issuer_index)?);
+//		assert_eq!(total_supply, wallet.balance(wallet.find(issuer_key)));
 
 		// request payment
 
@@ -305,6 +405,7 @@ mod tests {
 					(inputs, sum, any_overflow || this_overflow)
 				}
 			);
+//		let inputs_amounts = wallet.remove(&DerivationIndex(vec![1])).expect("There should be inputs");
 		assert!(!overflow); // TODO: error/result
 		inputs.insert(0, genesis_spend);
 		println!("Inputs: {:?}", (&inputs, sum, overflow));
@@ -325,8 +426,8 @@ mod tests {
 		println!("Spend GraphEntry: {}", spend_address);
 		assert_eq!(&issuer_key, spend_address.owner());
 
-		wallet.receive(rest_amount, *spend_address.owner(), &rest_index);
 		wallet.receive(receive_amount, *spend_address.owner(), &receive_index);
+		wallet.receive(rest_amount, *spend_address.owner(), &rest_index);
 		println!("Wallet: {:?}", wallet);
 
 		Ok(())
