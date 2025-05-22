@@ -1,7 +1,10 @@
 use futures::lock::Mutex;
+use ruint::aliases::U256;
+use sn_curv::elliptic::curves::ECScalar;
 use tauri::{AppHandle, State, Manager};
-use autonomi::{Client, SecretKey, Wallet};
-use ant_act::ActExt;
+use autonomi::{Client, SecretKey, Wallet,
+	client::payment::PaymentOption};
+use ant_act::{ActExt};
 
 
 struct AppState {
@@ -28,15 +31,21 @@ async fn connect(local: bool, evm_pk: Option<String>, state: State<'_, Mutex<Opt
 
 		println!("EVM Address: {}", wallet.address());
 
+		let evm_pk = if &evm_pk[0..2] == "0x" {
+			&evm_pk[2..]
+		} else {
+			&evm_pk
+		};
+
 		let sk = SecretKey::from_bytes(sn_bls_ckd::derive_master_sk(
 			hex::decode(evm_pk).map_err(|e| format!("{}", e))?[0..32].try_into().unwrap()
 		).expect("Wrong bytes").serialize().into()).expect("Wrong bytes");
 
-		state = AppState {
+		*state = Some(AppState {
 			client,
 			wallet,
 			sk
-		}
+		});
 	}
 
 	Ok(())
@@ -50,14 +59,18 @@ async fn create_token(
 	total_supply: String,
 	state: State<'_, Mutex<Option<AppState>>>
 ) -> Result<String, String> {
-	let mut state = state.lock().await;
+	let state_opt = state.lock().await;
+	let state = state_opt.as_ref().ok_or("Not connected.")?;
 
-	let client = state.ok_or("Not connected.")?.client.clone();
-	let sk = state.ok_or("Not connected.")?.sk.clone();
+	let client = state.client.clone();
+	let sk = state.sk.clone();
+	let evm_wallet = state.wallet.clone();
 
-//	let act_wallet = ant_act::Wallet::new();
-	let act_wallet = client.act_wallet(sk);
-	let owner = act_wallet.request(DerivationIndex(vec![1]));
+	let with_wallet = PaymentOption::from(evm_wallet);
+
+	let mut act_wallet = ant_act::Wallet::new(sk);
+//	let act_wallet = client.act_wallet(sk);
+	let owner = act_wallet.request(vec![1].into());
 
 	let total_supply = U256::from_str_radix(&total_supply, 10).map_err(|e| format!("{}", e))?;
 	let genesis_spend = client.act_create(
@@ -66,16 +79,18 @@ async fn create_token(
 		decimals,
 		total_supply,
 		owner,
+		&with_wallet,
 	).await.map_err(|e| format!("{}", e))?;
 
-	Ok(hex::encode(genesis_spend.0))
+	Ok(genesis_spend.0.to_hex())
 }
 
 #[tauri::command]
 async fn balance(state: State<'_, Mutex<Option<AppState>>>) -> Result<(String, String), String> {
-	let mut state = state.lock().await;
+	let state_opt = state.lock().await;
+	let state = state_opt.as_ref().ok_or("Not connected.")?;
 
-	let wallet = state.ok_or("Not connected.")?.wallet.clone();
+	let wallet = state.wallet.clone();
 
 	let ant = format!("{}", wallet.balance_of_tokens().await.map_err(|e| format!("{}", e))?);
 	let eth = format!("{}", wallet.balance_of_gas_tokens().await.map_err(|e| format!("{}", e))?);
@@ -90,13 +105,11 @@ pub fn run() {
 		.plugin(tauri_plugin_opener::init())
 		.invoke_handler(tauri::generate_handler![
 			connect,
+			create_token,
 			balance,
 		])
 		.setup(|app| {
-			app.manage(Mutex::new(AppState {
-				client: None,
-				wallet: None,
-			}));
+			app.manage(Mutex::new(None::<AppState>));
 			Ok(())
 		})
 		.run(tauri::generate_context!())

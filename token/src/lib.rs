@@ -16,7 +16,7 @@ pub struct TokenInfo {
 }
 
 #[derive(Clone, Debug)]
-pub struct Wallet(SecretKey, HashMap<DerivationIndex, Vec<(PublicKey, U256)>>);
+pub struct Wallet(SecretKey, HashMap<Vec<u8>, Vec<(PublicKey, U256)>>);
 // TODO: ? give index key a name
 // TODO: ? optional pubkey ("none" meaning waiting for payment)? this would require supplying amount arg for request.
 // TODO: read/write wallet to autonomi: serde.
@@ -27,26 +27,26 @@ impl Wallet {
 		Self(sk, HashMap::new())
 	}
 	
-	pub fn request(&mut self, index: &DerivationIndex) -> PublicKey {
-		let receiver_sk = self.0.derive_child(&index.0);
+	pub fn request(&mut self, index: Vec<u8>) -> PublicKey {
+		let receiver_sk = self.0.derive_child(&index);
 		let receiver_key = receiver_sk.public_key();
 		println!("request BLS SecretKey: {:.4}(...)", receiver_sk.to_hex());
 		println!("request Derived PublicKey: {:.4}(...), {:?}", receiver_key.to_hex(), receiver_key);
 
-		if self.1.get(index).is_none() {
-			self.1.insert(index.clone(), vec![]);
+		if self.1.get(&index).is_none() {
+			self.1.insert(index, vec![]);
 		}
 
 		receiver_key
 	}
 
-	pub fn receive(&mut self, amount: U256, spend: PublicKey, index: &DerivationIndex) {
-		match self.1.get_mut(index) {
+	pub fn receive(&mut self, amount: U256, spend: PublicKey, index: Vec<u8>) {
+		match self.1.get_mut(&index) {
 			Some(transactions) => {
 				transactions.push((spend, amount));
 			},
 			None => {
-				self.1.insert(index.clone(), vec![(spend, amount)]);
+				self.1.insert(index, vec![(spend, amount)]);
 			}
 		};
 		// TODO: validate
@@ -71,7 +71,7 @@ impl Wallet {
 		}
 	}
 
-	pub fn balance(&self, index: DerivationIndex) -> Result<U256, String> {
+	pub fn balance(&self, index: Vec<u8>) -> Result<U256, String> {
 
 		let spends = match self.1.get(&index) {
 			None => {
@@ -92,7 +92,7 @@ impl Wallet {
 		}
 	}
 
-	pub fn unspent_outputs(&self, index: DerivationIndex) -> Result<(Vec<PublicKey>, U256), String> {
+	pub fn unspent_outputs(&self, index: Vec<u8>) -> Result<(Vec<PublicKey>, U256), String> {
 		let (outputs, sum, overflow) = self.1.get(&index).unwrap_or(&Vec::new()).iter()
 			.fold(
 				(Vec::<PublicKey>::new(), U256::from(0), false),
@@ -111,7 +111,7 @@ impl Wallet {
 	}
 
 
-//	pub fn find(&self, request: PublicKey) -> DerivationIndex {
+//	pub fn find(&self, request: PublicKey) -> Vec<u8> {
 //		// TODO: find index by deriving and comparing with all available indexes
 //	}
 }
@@ -160,10 +160,6 @@ impl WalletExt for Client {
 //		// TODO
 //	}
 }
-
-
-#[derive(Clone, Hash, Eq, PartialEq, Debug, Serialize, Deserialize)]
-pub struct DerivationIndex(Vec<u8>); // TODO: make this private and change functions attributes to Vec<u8>
 
 
 pub trait ActExt {
@@ -345,7 +341,7 @@ mod tests {
 		// TODO: read wallet from scratchpad
 
 		let mut wallet = Wallet::new(sk.clone());
-		let issuer_index = DerivationIndex(vec![1]);
+		let issuer_index = vec![1];
 		let issuer_key = wallet.request(&issuer_index);
 		let issuer_sk = sk.derive_child(&issuer_index.0);
 		println!("Wallet: {:?}", wallet);
@@ -382,19 +378,19 @@ mod tests {
 
 		let receive_amount = amount(200, DECIMALS);
 
-		let receive_index = DerivationIndex(vec![2]);
+		let receive_index = vec![2];
 		let receive_key = wallet.request(&receive_index);
 		println!("Wallet: {:?}", wallet);
 
 		// prepare rest output
 
-		let rest_index = DerivationIndex(vec![3]);
+		let rest_index = vec![3];
 		let rest_key = wallet.request(&rest_index);
 		println!("Wallet: {:?}", wallet);
 
 		// spend
 
-		let inputs_amounts = wallet.1.remove(&DerivationIndex(vec![1])).expect("There should be inputs");
+		let inputs_amounts = wallet.1.remove(&vec![1]).expect("There should be inputs");
 		let (mut inputs, sum, overflow) = inputs_amounts.iter()
 			.fold(
 				(Vec::<PublicKey>::new(), U256::from(0), false),
@@ -405,7 +401,6 @@ mod tests {
 					(inputs, sum, any_overflow || this_overflow)
 				}
 			);
-//		let inputs_amounts = wallet.remove(&DerivationIndex(vec![1])).expect("There should be inputs");
 		assert!(!overflow); // TODO: error/result
 		inputs.insert(0, genesis_spend);
 		println!("Inputs: {:?}", (&inputs, sum, overflow));

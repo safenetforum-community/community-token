@@ -18,36 +18,38 @@ async function connect(local: boolean) {
 }
 
 async function createToken() {
-  const nameInputEl = document.querySelector("#create-token name input");
+  const nameInputEl = document.querySelector("#create-token #name input");
   const name = nameInputEl.value;
   
-  const symbolInputEl = document.querySelector("#create-token symbol input");
+  const symbolInputEl = document.querySelector("#create-token #symbol input");
   const symbol = symbolInputEl.value;
   
-  const supplyInputEl = document.querySelector("#create-token supply input");
+  const supplyInputEl = document.querySelector("#create-token #supply input");
   const supply = supplyInputEl.value;
 
-  const decimalsInputEl = document.querySelector("#create-token decimals input");
+  const decimalsInputEl = document.querySelector("#create-token #decimals input");
   const decimals = decimalsInputEl.value;
 
   try {
     const tokenId = await invoke("create_token", {
       name: name,
       symbol: symbol,
-      decimals: decimals,
+      decimals: parseInt(decimals),
       totalSupply: supply,
     });
 
     message("Token ID: " + tokenId, "create-token")
+    error("", "create-token");
 
   } catch (e) {
     error("" + e, "create-token");
+    message("", "create-token")
   }
 }
 
 async function balance() {
   let balanceEl = document.querySelector("#balance");
-  if !balanceEl {
+  if (!balanceEl) {
     balanceEl = document.createElement("p");
     balanceEl.id = "balance";
     document.getElementById("connect").after(balanceEl);
@@ -58,8 +60,8 @@ async function balance() {
 }
 
 function message(text: string, afterId: string) {
-  let msgEl = document.querySelector("#{afterId} ~ .message");
-  if !msgEl {
+  let msgEl = document.querySelector(`#${afterId} ~ .message`);
+  if (!msgEl) {
     msgEl = document.createElement("p");
     msgEl.className = "message";
     document.getElementById(afterId).after(msgEl);
@@ -68,8 +70,8 @@ function message(text: string, afterId: string) {
 }
 
 function error(text: string, afterId: string) {
-  let errEl = document.querySelector("#{afterId} ~ .error");
-  if !errEl {
+  let errEl = document.querySelector(`#${afterId} ~ .error`);
+  if (!errEl) {
     errEl = document.createElement("p");
     errEl.className = "error";
     document.getElementById(afterId).after(errEl);
