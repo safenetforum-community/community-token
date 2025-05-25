@@ -41,6 +41,8 @@ async function createToken() {
     message("Token ID: " + tokenId, "create-token")
     error("", "create-token");
 
+    await balance();
+
   } catch (e) {
     error("" + e, "create-token");
     message("", "create-token")
@@ -56,7 +58,20 @@ async function balance() {
   }
 
   const balance = await invoke("balance");
-  balanceEl.innerHTML = "Balance: " + balance;
+  const actBalance = await invoke("act_balances");
+  console.log("actBalance");
+  console.log(actBalance);
+
+  let actBalanceHtml = "";
+  if (typeof actBalance === 'object') {
+    for (let symbol in actBalance) {
+      actBalanceHtml += `${symbol}: ${actBalance[symbol]}, `;
+    }
+    actBalanceHtml = actBalanceHtml.substring(0, actBalanceHtml.length - 2)
+  }
+  
+  balanceEl.innerHTML = "EVM balance: " + balance + "<br />"
+    + "ACT balance: " + actBalanceHtml;
 }
 
 function message(text: string, afterId: string) {
@@ -84,5 +99,7 @@ window.addEventListener("DOMContentLoaded", () => {
   document.querySelector("#main-connect-button")?.addEventListener("click", (e) => connect(false));
   document.querySelector("#local-connect-button")?.addEventListener("click", (e) => connect(true));
 
-  document.querySelector("#create-token button")?.addEventListener("click", (e) => createToken());
+  document.querySelector("#create-token button")?.addEventListener("click", async (e) => {
+    await createToken();
+  });
 });

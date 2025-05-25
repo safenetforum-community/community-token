@@ -5,14 +5,13 @@ use serde::{Serialize, Deserialize, Serializer, Deserializer,
 	de::{Visitor, MapAccess, value::MapAccessDeserializer}
 };
 use ruint::aliases::U256;
-use sn_curv::elliptic::curves::ECScalar;
-use autonomi::{SecretKey, Client, PublicKey, client::payment::PaymentOption, XorName, Chunk, Bytes, GraphEntry, GraphEntryAddress};
+use autonomi::{SecretKey, Client, PublicKey, client::payment::PaymentOption, XorName, Chunk, Bytes, GraphEntry, GraphEntryAddress, ChunkAddress};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct TokenInfo {
-	symbol: String,
-	name: String,
-	decimals: u8,
+	pub symbol: String,
+	pub name: String,
+	pub decimals: u8,
 }
 
 #[derive(Clone, Debug)]
@@ -59,7 +58,7 @@ impl Wallet {
 							|mut token_balances, (token_id, _spend, amount)| {
 
 						match token_balances.get(token_id) {
-							None => token_balances.insert(*token_id, Ok(U256::ZERO)),
+							None => token_balances.insert(*token_id, Ok(*amount)),
 							Some(Ok(sum)) => {
 								token_balances.insert(*token_id,
 									match sum.overflowing_add(*amount) {
@@ -198,7 +197,9 @@ pub trait ActExt {
 
 	fn unspent(&self, pubkey: &PublicKey, spend: PublicKey) -> impl Future<Output = Result<U256, String>> + Send;
 
-	fn act_balance(&self, pubkey: PublicKey, spends: Vec<PublicKey>) -> impl Future<Output = Result<U256, String>> + Send;
+	fn act_balance(&self, pubkey: &PublicKey, spends: Vec<PublicKey>) -> impl Future<Output = Result<U256, String>> + Send;
+
+	fn act_token_info(&self, token_id: &XorName) -> impl Future<Output = Result<TokenInfo, String>> + Send;
 }
 
 impl ActExt for Client {
@@ -231,9 +232,7 @@ impl ActExt for Client {
 
 		// create genesis tx with output to given key
 
-		let genesis_owner = SecretKey::from_bytes(sn_bls_ckd::derive_master_sk(
-			&XorName::from_content(&token_info_bytes).0
-		).expect("Wrong bytes").serialize().into()).expect("Wrong bytes");
+		let genesis_owner = SecretKey::random();
 		println!("Genesis owner: {:?}", genesis_owner);
 
 		let genesis_owner_pubkey = genesis_owner.public_key();
@@ -273,12 +272,11 @@ impl ActExt for Client {
 		}
 	}
 
-	async fn act_balance(&self, pubkey: PublicKey, spends: Vec<PublicKey>) -> Result<U256, String>
-	{
+	async fn act_balance(&self, pubkey: &PublicKey, spends: Vec<PublicKey>) -> Result<U256, String> {
 		let stream = stream::iter(spends);
 
 		stream.fold(Ok(U256::ZERO), |sum_res, spend_pk| async move {
-			let unsp = self.unspent(&pubkey, spend_pk).await?;
+			let unsp = self.unspent(pubkey, spend_pk).await?;
 
 			match sum_res?.overflowing_add(unsp) {
 				(added, false) => Ok(added),
@@ -287,7 +285,17 @@ impl ActExt for Client {
 		}).await
 	}
 
-//	async fn act_token_info // TODO
+	async fn act_token_info(&self, token_id: &XorName) -> Result<TokenInfo, String> {
+		let token_info_address = ChunkAddress::new(*token_id);
+
+		let chunk = self.chunk_get(&token_info_address)
+			.await.map_err(|e| format!("{}", e))?;
+
+		let token_info: TokenInfo = serde_json::from_slice(chunk.value())
+			.map_err(|e| format!("{}", e))?;
+
+		Ok(token_info)
+	}
 
 //	/// Returns rest amount
 //	pub async fn act_spend(from: PublicKey, from_spends: Vec<PublicKey>, amount: U256, to: PublicKey, rest_to: PublicKey) -> Result<U256, String> {
@@ -299,8 +307,9 @@ impl ActExt for Client {
 
 #[cfg(test)]
 mod tests {
-	use autonomi::{Wallet as EvmWallet};
+	use sn_curv::elliptic::curves::ECScalar;
 	use tracing::Level;
+	use autonomi::{Wallet as EvmWallet};
 	use super::*;
 
 	fn init_logging() {
@@ -362,10 +371,11 @@ mod tests {
 		println!("Gas Balance: {}", evm_wallet.balance_of_gas_tokens()
 			.await.map_err(|e| format!("{}", e))?);
 
-//		let sk = SecretKey::random();
-		let sk = SecretKey::from_bytes(sn_bls_ckd::derive_master_sk(
-			hex::decode(EVM_PRIVKEY).map_err(|e| format!("{}", e))?[0..32].try_into().unwrap()
-		).expect("Wrong bytes").serialize().into()).expect("Wrong bytes");
+		let sk = SecretKey::random();
+//		let sk = SecretKey::from_bytes(sn_bls_ckd::derive_master_sk(
+//			hex::decode(EVM_PRIVKEY).map_err(|e| format!("{}", e))?[0..32].try_into().unwrap()
+//		).expect("Wrong bytes").serialize().into()).expect("Wrong bytes");
+
 
 		// TODO: read wallet from scratchpad
 
@@ -375,10 +385,11 @@ mod tests {
 		let issuer_sk = sk.derive_child(&issuer_index);
 		println!("Wallet: {:?}", wallet);
 
+		let symbol = "AANT5";
 		let total_supply: U256 = amount(1_000_000, DECIMALS);
 		let (genesis_spend, token_id) = client.act_create(
 			"Alternative Autonomi Network Token".into(),
-			"AANT3".into(),
+			symbol.into(),
 			DECIMALS,
 			total_supply,
 			issuer_key,
@@ -394,14 +405,20 @@ mod tests {
 
 		// check balance on that key
 
-		let balance_validation = client.act_balance(issuer_key, vec![genesis_spend]).await?;
-		
+		let balance_validation = client.act_balance(&issuer_key, vec![genesis_spend]).await?;
 		println!("ACT Token issuer Balance: {}", balance_validation);
-//		assert!(!overflow); // TODO: error/result
 		assert_eq!(total_supply, balance_validation);
-//		assert_eq!(total_supply, wallet.balance_total().get(token_id));
 		assert_eq!(total_supply, wallet.balance(token_id, issuer_index)?);
-//		assert_eq!(total_supply, wallet.balance(wallet.find(issuer_key)));
+//		assert_eq!(total_supply, wallet.balance(token_id, wallet.find(issuer_key)?)?);
+
+		let balance_total = wallet.balance_total();
+		println!("Wallet balance_total: {:?}", balance_total);
+		assert_eq!(1, balance_total.len());
+		assert_eq!(total_supply, balance_total.get(&token_id).expect("Wrong token_id").clone()?);
+
+		let token_info = client.act_token_info(&token_id).await?;
+		println!("ACT Token symbol: {}", token_info.symbol);
+		assert_eq!(symbol, token_info.symbol);
 
 		// request payment
 
