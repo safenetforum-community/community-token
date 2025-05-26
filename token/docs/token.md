@@ -4,34 +4,34 @@ Autonomi token standard, that enables issuing own token by anyone – from scrat
 
 Token is based on a DAG of transactions represented in the network's storage as instances of GraphEntry data. GraphEntries are connected by *parents* and *descendants* lists. The token comes in two flavors: *Native* and *Bridged*.
 
-We begin with creating lib/application for Autonomi, not icluding changes to API/node code.
+We begin with creating library and application for Autonomi, not including changes to API/node code.
 
-## Native
+## Native ACT
 
 Each graph is a separate token.
 
-Token ID is a xorname of the Chunk containing token info: *symbol*, *name*, *decimals*. Future Native Token could have token ID consisting of zeros and token info would be hardcoded.
+Token ID is a xorname of the Chunk containing token info: *symbol*, *name*, *decimals* and address (PublicKey) of genesis spend. This token ID will be different for every new token, even with same symbol, name and decimals.
 
 Genesis transaction GE:
-* *content* token ID, as in ordinary GE
-* Empty *parents* (indicating a genesis transaction)
+* *content* is token ID
+* Empty *parents* (indicating Native genesis transaction)
 * Single *output* to issuer's key. This value is a *totalSupply*.
 
-## Bridged (ERC20)
+## Bridged (ERC20) ACT
 
 A token consists of multiple graphs, each of them created from a EVM burn transaction. Token info can be read from EVM blockchain, currently Arbitrum.
 
-Token ID is a hash/derivation of EVM token address. TODO: or maybe first bridge user should create token info structure?
+Token ID is an EVM token contract address prepended by characters "ERC20", a zero byte (0x00) and first 6 bytes of SHA256 hash of minimal unsigned int (eg. `0x02AB34` for 174900) representation of Chain Id (eg. `sha256(0xA4B1)[0..6]` for Arbittrum One). Potential Native Token would be simply a bridged [ANT ERC20 from Arbitrum One](https://arbiscan.io/token/0xa78d8321b20c4ef90ecd72f2588aa985a4bdb684), so its token ID would be (0x)`4552433230 00 2CEA1CB4897D A78D8321B20C4EF90ECD72F2588AA985A4BDB684`.
 
 Genesis transaction GE:
-* *content* is a burn transaction ID on the blockchain
-* Single *parents* entry, pointing to the GE itself (or zero?), as a marker of Bridged genesis transaction.
+* *content* is token ID with zeros as token contract address (indicating Bridged genesis transaction)
+* Single *parents* entry, being a burn TX id on EVM blockchain
+* Single *output* to public key of secret created from EVM Private Key and burn TX id. This balance can be then spent by using the same secret.
 
 ## Common (Native / Bridged)
 
 Ordinary GE:
 * Parents
-  * Genesis GE
   * Input 1
   * Input 2
   * ...
@@ -54,13 +54,14 @@ Validation
 * Parent's Genesis GE is equal children's Genesis GE
 * Graph acyclicity (TODO: check with theory/proofs)
   * Keep list/hashset of visited GEs, check that they are not visited twice
-  * A "self-cycle" is allowed as a special marker of Bridged genesis transaction
 * Sum of inputs = sum of outputs 
 * Genesis transaction
 
+If an invalid transaction is detected during validation of an incoming transaction (someone sent us money), such transaction could be rejected by putting a "burn" GrephEntry (one with empty *outputs*) or publishing a marker.
+
 ## A Wallet
 
-List of Private Keys, which Public Keys are outputs of some transactions. Together with transaction pointers to include as parents, when user wants to spend the output.
+List of Secret Keys, which Public Keys are outputs of some transactions. Together with transaction pointers to include as parents, when user wants to spend the output.
 
 ?? Should wallet be kept on the network or locally? Two types of the wallet? Consider security and convenience.
 
