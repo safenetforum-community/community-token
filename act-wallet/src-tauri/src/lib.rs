@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use futures::{lock::Mutex, stream, StreamExt};
 use ruint::aliases::U256;
 use sn_curv::elliptic::curves::ECScalar;
-use tauri::{State, Manager};
+use tauri::{State, Manager, Theme};
 use autonomi::{Client, SecretKey, Wallet,
 	client::payment::PaymentOption};
 use ant_act::{ActExt, Wallet as ActWallet};
@@ -54,6 +54,12 @@ async fn connect(local: bool, evm_pk: Option<String>, state: State<'_, Mutex<Opt
 	}
 
 	Ok(())
+}
+
+#[tauri::command]
+async fn is_connected(state: State<'_, Mutex<Option<AppState>>>) -> Result<bool, String> {
+	let state_opt = state.lock().await;
+	Ok(state_opt.is_some())
 }
 
 #[tauri::command]
@@ -180,12 +186,16 @@ pub fn run() {
 		.plugin(tauri_plugin_opener::init())
 		.invoke_handler(tauri::generate_handler![
 			connect,
+			is_connected,
 			create_token,
 			balance,
 			act_balances,
 		])
 		.setup(|app| {
 			app.manage(Mutex::new(None::<AppState>));
+			if let Some(window) = app.webview_windows().iter().next() {
+				window.1.set_theme(Some(Theme::Dark))?;
+			}
 			Ok(())
 		})
 		.run(tauri::generate_context!())

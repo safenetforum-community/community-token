@@ -9,28 +9,58 @@
   </head>
 
   <body>
-    <main class="container">
-      <h1>Autonomi Community Token</h1>
+    <div id="banner"></div>
+    <h1>ACT Wallet</h1>
 
-      <div id="connect">
+    <div id="connect">
+      <p>
+        Provide a private key on EVM (Arbitrum/Sepolia/Local) network for payments and access. Leave it empty to generate random account for you.
+      </p>
+      <p>
+        <input id="pk-input" placeholder="EVM private key..." value="0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80" size=80 />
+      </p>
+      <p>
+        <button id="main-connect-button" type="button">Connect to Mainnet</button>
+        <button id="local-connect-button" type="button">Connect to Local Testnet</button>
+      </p>
+    </div>
+    <dl id="balance">
+      <p></p>
+    </dl>
+
+    <div id="panel">
+
+      <ul id="menu">
+        <li data-targetid="request" class="active">Request</li>
+        <li data-targetid="pay">Pay</li>
+        <li data-targetid="receive">Receive</li>
+        <li data-targetid="create-token">Create Token</li>
+      </ul>
+
+      <div id="request" class="subpanel">
         <p>
-          Provide a private key on EVM (Arbitrum/Sepolia/Local) network for payments and access. Leave it empty to generate random account for you.
-        </p>
-        <p>
-          <input id="pk-input" placeholder="EVM private key..." value="0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80" size=80 />
-        </p>
-        <p>
-          <button id="main-connect-button" type="button">Connect Mainnet</button>
-          <button id="local-connect-button" type="button">Connect Local Testnet</button>
+          Request
         </p>
       </div>
 
-      <div id="create-token">
+      <div id="pay" class="subpanel" hidden>
+        <p>
+          Pay
+        </p>
+      </div>
+
+      <div id="receive" class="subpanel" hidden>
+        <p>
+          Receive
+        </p>
+      </div>
+
+      <div id="create-token" class="subpanel" hidden>
         <p id="name">
-          Token name: <input placeholder="e.g. Autonomi Community Token..." value="" size=60 />
+          Token name: <input placeholder="e.g. David Irvine Memecoin..." value="" size=60 />
         </p>
         <p id="symbol">
-          Symbol: <input placeholder="e.g. ACT..." value="" size=10 />
+          Symbol: <input placeholder="e.g. IRVINE..." value="" size=10 />
         </p>
         <p id="supply">
           Total Supply: <input placeholder="e.g. 100_000_000_123_456_789_123_456_789..." value="" size=40 />
@@ -43,6 +73,7 @@
         </p>
       </div>
 
-    </main>
+    </div>
+
   </body>
 </html>

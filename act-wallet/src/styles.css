@@ -1,3 +1,94 @@
+body {
+  cursor: default;
+  margin: 0;
+  font-family: serif;
+  padding-bottom: 10px;
+  margin-bottom: 80px;
+}
+
+p {
+  margin: 10px;
+}
+
+h1 {
+  text-align: right;
+  font-size: 1.5em;
+  background-color: rgba(108, 148, 128, .1);
+  margin: 0;
+  padding: 10px;
+  font-family: sans-serif;
+  box-sizing: border-box;
+}
+
+#banner {
+  background-image: url("act_back.jpg");
+  background-size: cover;
+  aspect-ratio: 4.7;
+}
+
+#connect, #balance {
+  background-color: rgba(108, 148, 128, .2);
+  border-top: 1px solid rgba(108, 148, 128, .1);
+  border-bottom: 1px solid rgba(108, 148, 128, .1);
+  opacity: 0.5;
+}
+
+dl#balance {
+  margin: 0;
+}
+
+dl#balance dd, dl#balance dt {
+  display: inline;
+}
+
+#panel {
+  box-sizing: border-box;
+}
+
+#menu {
+  border: 1px solid rgba(108, 148, 128, .8);
+  border-style: solid none;
+}
+
+ul#menu {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+ul#menu li {
+  display: inline-block;
+  padding: 10px 30px;
+  min-width: 50px;
+  opacity: 0.8;
+  font-family: sans-serif;
+}
+
+ul#menu li.active {
+  background-color: rgba(108, 148, 128, .1);
+}
+
+ul#menu li:hover {
+  background-color: rgba(108, 148, 128, .2);
+}
+
+#panel .subpanel {
+  padding: 20px;
+}
+
 .error {
   color: red;
 }
+
+.message, .error {
+  width: 100%;
+  height: 80px;
+  overflow: scroll;
+  margin: 0;
+  padding: 10px;
+  box-sizing: border-box;
+  position: fixed;
+  bottom: 0px;
+  background-color: rgba(108, 148, 128, .5);
+}
+
