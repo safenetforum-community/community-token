@@ -7,14 +7,14 @@ async function refresh() {
   }
 }
 
-async function connect(local: boolean) {
+async function connect(network: string) {
   const pkInputEl = document.querySelector("#pk-input");
 
   if (pkInputEl) {
     const pk = pkInputEl.value || null;
     console.log("Connecting Autonomi...");
     await invoke("connect", {
-      local: local,
+      network: network,
       evmPk: pk,
     });
     console.log("Connected.");
@@ -53,37 +53,43 @@ async function createToken() {
   }
 }
 
+function toHtml(obj: object) {
+  let balHtml = "";
+  for (let symbol in obj) {
+    balHtml += `<strong>${symbol}</strong>: ${obj[symbol]}, `;
+  }
+  return balHtml.substring(0, balHtml.length - 2); // remove last comma
+}
+
 async function balance() {
   document.getElementById("balance").hidden = false;
   let balanceEl = document.querySelector("#balance p");
 
-  const balance = await invoke("balance");
+  let bal = await invoke("balance");
+  console.log(bal);
+  if (Array.isArray(bal)) {
+    bal = toHtml({ "ATTOS": bal[0], "WEI": bal[0] });
+  }
   const actBalance = await invoke("act_balances");
   console.log("actBalance");
   console.log(actBalance);
 
   let actBalanceHtml = "–";
-  if (typeof actBalance === 'object') {
-    actBalanceHtml = "";
-    for (let symbol in actBalance) {
-      actBalanceHtml += `<strong>${symbol}</strong>: ${actBalance[symbol]}, `;
-    }
-    actBalanceHtml = actBalanceHtml.substring(0, actBalanceHtml.length - 2); // remove last comma
+  if (typeof actBalance === 'object' && Object.keys(actBalance).length > 0) {
+    actBalanceHtml = toHtml(actBalance);
   }
   
-  balanceEl.innerHTML = "<dt>EVM balance</dt> <dd>" + balance + "</dd> <br />"
+  balanceEl.innerHTML = "<dt>EVM balance</dt> <dd>" + bal + "</dd> <br />"
     + "<dt>ACT balance</dt> <dd>" + actBalanceHtml + "</dd>";
 }
 
-function switchTo(id: string) {
-}
 
 function message(text: string, afterId: string) {
-  let msgEl = document.querySelector(`#${afterId} ~ .message`);
+  let msgEl = document.querySelector(`#${afterId} .message`);
   if (!msgEl) {
     msgEl = document.createElement("p");
     msgEl.className = "message";
-    document.getElementById(afterId).after(msgEl);
+    document.getElementById(afterId).append(msgEl);
   }
   if (!text) {
     msgEl.hidden = true;
@@ -95,11 +101,11 @@ function message(text: string, afterId: string) {
 }
 
 function error(text: string, afterId: string) {
-  let errEl = document.querySelector(`#${afterId} ~ .error`);
+  let errEl = document.querySelector(`#${afterId} .error`);
   if (!errEl) {
     errEl = document.createElement("p");
     errEl.className = "error";
-    document.getElementById(afterId).after(errEl);
+    document.getElementById(afterId).append(errEl);
   }
   if (!text) {
     errEl.hidden = true;
@@ -114,19 +120,20 @@ window.addEventListener("DOMContentLoaded", () => {
   document.getElementById("balance").hidden = true;
   refresh();
 
-  document.querySelector("#main-connect-button")?.addEventListener("click", (e) => connect(false));
-  document.querySelector("#local-connect-button")?.addEventListener("click", (e) => connect(true));
+  document.querySelector("#main-connect-button")?.addEventListener("click", (e) => connect("Main"));
+  document.querySelector("#local-connect-button")?.addEventListener("click", (e) => connect("Local"));
+  document.querySelector("#alpha-connect-button")?.addEventListener("click", (e) => connect("Alpha"));
 
   let menuButtons = document.querySelectorAll("#menu li");
   for (const button of menuButtons) {
     button.addEventListener("click", (e) => {
-      let target = e.target.getAttribute("data-targetid");
+      let target = button.getAttribute("data-targetid");
   
       document.querySelectorAll("#panel .subpanel").forEach((subpanel) => subpanel.hidden = true);
       document.getElementById(target).hidden = false;
   
       document.querySelector("#panel #menu .active").setAttribute("class", "");
-      e.target.setAttribute("class", "active");
+      button.setAttribute("class", "active");
     });
   }
   

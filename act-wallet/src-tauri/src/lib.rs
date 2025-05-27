@@ -15,16 +15,18 @@ struct AppState {
 	act_wallet: ActWallet,
 }
 
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+enum Network {Local, Alpha,	Main}
 
 #[tauri::command]
-async fn connect(local: bool, evm_pk: Option<String>, state: State<'_, Mutex<Option<AppState>>>) -> Result<(), String> {
+async fn connect(network: Network, evm_pk: Option<String>, state: State<'_, Mutex<Option<AppState>>>) -> Result<(), String> {
 	let mut state = state.lock().await;
 
 	if state.is_none() {
-		let client = if local {
-			Client::init_local().await
-		} else {
-			Client::init().await
+		let client = match network {
+			Network::Local => Client::init_local().await,
+			Network::Main => Client::init().await,
+			Network::Alpha => Client::init_alpha().await,
 		}.map_err(|e| format!("{}", e))?;
 
 		let evm_pk = evm_pk.unwrap_or(SecretKey::random().to_hex()); // bls secret key can be used as eth privkey

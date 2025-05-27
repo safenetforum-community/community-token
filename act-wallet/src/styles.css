@@ -64,12 +64,21 @@ ul#menu li {
   font-family: sans-serif;
 }
 
+ul#menu li[data-targetid="create-token"] {
+  font-style: italic;
+}
+
 ul#menu li.active {
   background-color: rgba(108, 148, 128, .1);
 }
 
 ul#menu li:hover {
   background-color: rgba(108, 148, 128, .2);
+}
+
+ul#menu li svg {
+  height: 20px;
+  vertical-align: text-top;
 }
 
 #panel .subpanel {
@@ -88,7 +97,8 @@ ul#menu li:hover {
   padding: 10px;
   box-sizing: border-box;
   position: fixed;
-  bottom: 0px;
+  bottom: 0;
+  left: 0;
   background-color: rgba(108, 148, 128, .5);
 }
 

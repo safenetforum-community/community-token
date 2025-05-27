@@ -21,6 +21,7 @@
       </p>
       <p>
         <button id="main-connect-button" type="button">Connect to Mainnet</button>
+        <button id="alpha-connect-button" type="button">Connect to Alpha</button>
         <button id="local-connect-button" type="button">Connect to Local Testnet</button>
       </p>
     </div>
@@ -31,9 +32,28 @@
     <div id="panel">
 
       <ul id="menu">
-        <li data-targetid="request" class="active">Request</li>
-        <li data-targetid="pay">Pay</li>
-        <li data-targetid="receive">Receive</li>
+        <li data-targetid="request" class="active">
+          <svg enable-background="new 0 0 24 24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path d="m1 22h4v-11h-4zm19-5h-7l-2.09-0.73 0.33-0.94 1.76 0.67h2.82c0.65 0 1.18-0.53 1.18-1.18 0-0.49-0.31-0.93-0.77-1.11l-7.26-2.71h-1.97v9.02l7 1.98 8-3c-0.01-1.1-0.89-2-2-2z"/>
+            <path d="m16.88 8.858c-2.098 5.411e-4 -3.993 1.252-4.816 3.182l4.336 1.619c0.46 0.18 0.7695 0.6194 0.7695 1.109 0 0.65 0.4676 0.244 0.984 0.6388l2.016 1.541c0.2723 0.2082 0.6633 0.08529 0.9434 0.2363 0.6535-0.8962 1.006-1.977 1.006-3.086 9.95e-4 -2.894-2.345-5.24-5.238-5.24z" display="none" opacity=".314" stroke-width="0"/>
+          </svg>
+          Request
+        </li>
+        <li data-targetid="pay">
+          <svg version="1.1" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path d="M0 0h24v24H0z" fill="none"/>
+            <path d="m20 6h-16c-1.11 0-1.99 0.89-1.99 2l-0.01 12c0 1.11 0.89 2 2 2h16c1.11 0 2-0.89 2-2v-12c0-1.11-0.89-2-2-2zm0 14h-16v-6h16zm0-10h-16v-2h16z"/>
+          </svg>
+          Pay
+        </li>
+        <li data-targetid="receive">
+          <svg enable-background="new 0 0 24 24" version="1.1" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path d="m1 22h4v-11h-4zm19-5h-7l-2.09-0.73 0.33-0.94 1.76 0.67h2.82c0.65 0 1.18-0.53 1.18-1.18 0-0.49-0.31-0.93-0.77-1.11l-7.26-2.71h-1.97v9.02l7 1.98 8-3c-0.01-1.1-0.89-2-2-2z"/>
+            <path d="m16.88 8.858c-2.098 5.411e-4 -3.993 1.252-4.816 3.182l4.336 1.619c0.46 0.18 0.7695 0.6194 0.7695 1.109 0 0.65 0.4676 0.244 0.984 0.6388l2.016 1.541c0.2723 0.2082 0.6633 0.08529 0.9434 0.2363 0.6535-0.8962 1.006-1.977 1.006-3.086 9.95e-4 -2.894-2.345-5.24-5.238-5.24z" display="none" opacity=".314" stroke-width="0"/>
+            <path d="m16.88 8.858c-1.804 0.0592-3.41 0.8673-4.447 2.449l4.59 1.752c0.8296 0.5634 0.9413 1.42 0.9413 1.91 0 0.65-0.5862 1.031-0.5862 1.031 1.466 0.02454 2.966 0.0265 4.381 0.01956 0.1859-0.6779 0.3089-0.8029 0.3594-1.922 9.95e-4 -2.894-2.345-5.24-5.238-5.24z" fill-opacity=".9864" stroke-width="0"/>
+          </svg>
+          Receive
+        </li>
         <li data-targetid="create-token">Create Token</li>
       </ul>
 
