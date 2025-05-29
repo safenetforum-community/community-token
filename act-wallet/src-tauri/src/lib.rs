@@ -5,7 +5,7 @@ use sn_curv::elliptic::curves::ECScalar;
 use tauri::{State, Manager, Theme};
 use autonomi::{Client, SecretKey, Wallet,
 	client::payment::PaymentOption};
-use ant_act::{ActExt, Wallet as ActWallet};
+use ant_act::{ActExt, Wallet as ActWallet, TokenInfo};
 
 
 struct AppState {
@@ -114,19 +114,9 @@ async fn balance(state: State<'_, Mutex<Option<AppState>>>) -> Result<(String, S
 	Ok((ant, eth))
 }
 
-#[tauri::command]
-async fn act_balances(state: State<'_, Mutex<Option<AppState>>>) -> Result<HashMap<String, String>, String> {
-	let state_opt = state.lock().await;
-	let state = state_opt.as_ref().ok_or("Not connected.")?;
-	let wallet = &state.act_wallet;
-	let client = &state.client;
-
-	let balances = wallet.balance_total();
-	println!("balances: {:?}", balances);
-	stream::iter(balances.iter())
-		.fold(Ok(HashMap::<String, String>::new()), |balances_res: Result<HashMap<String, String>, HashMap<String, String>>, (token_id, balance_res)| async move {
-			let info_res = client.act_token_info(token_id).await;
-
+fn describe_balances(results: &Vec<(Result<TokenInfo, String>, Result<U256, String>)>) -> Result<HashMap<String, String>, HashMap<String, String>> {
+	results.iter()
+		.fold(Ok(HashMap::<String, String>::new()), |balances_res: Result<HashMap<String, String>, HashMap<String, String>>, (info_res, balance_res)| {
 			let entry_res = match info_res {
 				Err(err) => {
 					let len = match balances_res {
@@ -152,8 +142,8 @@ async fn act_balances(state: State<'_, Mutex<Option<AppState>>>) -> Result<HashM
 						});
 
 					match balance_res {
-						Ok(balance) => Ok((info.symbol, balance)),
-						Err(e) => Err((info.symbol, e.to_string())),
+						Ok(balance) => Ok((info.symbol.clone(), balance)),
+						Err(e) => Err((info.symbol.clone(), e.to_string())),
 					}
 				}
 			};
@@ -177,7 +167,27 @@ async fn act_balances(state: State<'_, Mutex<Option<AppState>>>) -> Result<HashM
 					}
 				}
 			}
-		}).await
+		})
+}
+
+#[tauri::command]
+async fn act_balances(state: State<'_, Mutex<Option<AppState>>>) -> Result<HashMap<String, String>, String> {
+	let state_opt = state.lock().await;
+	let state = state_opt.as_ref().ok_or("Not connected.")?;
+	let wallet = &state.act_wallet;
+	let client = &state.client;
+
+	let balances = wallet.balance_total();
+	println!("balances: {:?}", balances);
+
+	let balances_results = stream::iter(balances.iter())
+		.then(|(token_id, balance_res)| async move {
+			let info_res = client.act_token_info(token_id).await;
+
+			(info_res, balance_res.clone())
+		}).collect().await;
+
+	describe_balances(&balances_results)
 		.map_err(|balances_errors: HashMap<String, String>| format!("{:?}", balances_errors))
 }
 
@@ -202,4 +212,66 @@ pub fn run() {
 		})
 		.run(tauri::generate_context!())
 		.expect("error while running tauri application");
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	#[test]
+	fn test_describe_balances() {
+		let mut balances = Vec::<(Result<TokenInfo, String>, Result<U256, String>)>::new();
+
+		balances.push((Ok(TokenInfo {
+			symbol: "EACT".to_string(),
+			name: "Example Autonomi Community Token".to_string(),
+			decimals: 18,
+
+		}), U256::from_str_radix("10_000_000_000000_000000_000000", 10).map_err(|e| format!("{}", e)) ));
+
+		assert_eq!(describe_balances(&balances), Ok(HashMap::from([
+			("EACT".to_string(), "10000000.0".to_string()),
+		])));
+
+		balances.push((Ok(TokenInfo {
+			symbol: "EACT2".to_string(),
+			name: "Example Autonomi Community Token".to_string(),
+			decimals: 18,
+
+		}), Err("Some example error".to_string()) ));
+
+		assert_eq!(describe_balances(&balances), Err(HashMap::from([
+			("EACT".to_string(), "10000000.0".to_string()),
+			("EACT2".to_string(), "Some example error".to_string()),
+		])));
+
+		balances.push((Err("Some example error".to_string()), Err("Some other example error".to_string()) ));
+
+		assert_eq!(describe_balances(&balances), Err(HashMap::from([
+			("EACT".to_string(), "10000000.0".to_string()),
+			("EACT2".to_string(), "Some example error".to_string()),
+			("(2) Some example error".to_string(), "Token info error".to_string()),
+		])));
+	}
+
+	#[test]
+	fn sk_generation_from_evm_privkey() {
+
+		let sk = SecretKey::from_bytes(sn_bls_ckd::derive_master_sk(
+			hex::decode("ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80").expect("Decode EVM privkey")[0..32].try_into().unwrap()
+		).expect("Wrong bytes").serialize().into()).expect("Wrong bytes");
+
+		assert_eq!("4f7eedb7b093537a4402daa0769dfca018520ee3ea2107338d89cbfcc312451b", sk.to_hex());
+
+		let sk = SecretKey::from_hex("4f7eedb7b093537a4402daa0769dfca018520ee3ea2107338d89cbfcc312451b").expect("Wrong hex");
+
+		assert_eq!("4f7eedb7b093537a4402daa0769dfca018520ee3ea2107338d89cbfcc312451b", sk.to_hex());
+
+		let sk = SecretKey::from_bytes(
+			hex::decode("4f7eedb7b093537a4402daa0769dfca018520ee3ea2107338d89cbfcc312451b").expect("Decode EVM privkey")[0..32].try_into().unwrap()
+		).expect("Wrong bytes");
+
+		assert_eq!("4f7eedb7b093537a4402daa0769dfca018520ee3ea2107338d89cbfcc312451b", sk.to_hex());
+	}
+
 }
