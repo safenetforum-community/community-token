@@ -13,11 +13,16 @@ async function connect(network: string) {
   if (pkInputEl) {
     const pk = pkInputEl.value || null;
     console.log("Connecting Autonomi...");
-    await invoke("connect", {
+    const currentPk = await invoke("connect", {
       network: network,
       evmPk: pk,
     });
     console.log("Connected.");
+
+    if (pk === null) {
+//      await navigator.clipboard.writeText(currentPk);
+      window.alert("Your EVM Private Key, keep it safely: " + currentPk);
+    }
 
     await refresh();
   }
@@ -44,7 +49,7 @@ async function createToken() {
       totalSupply: supply,
     });
 
-    message("Token ID: " + tokenId, "create-token")
+    message("Token ID: " + tokenId, "create-token");
 
     await balance();
 
@@ -53,10 +58,26 @@ async function createToken() {
   }
 }
 
-function toHtml(obj: object) {
+async function request() {
+  const tokenId = document.querySelector("#request-token-id input")?.value;
+  console.log("tokenId: ", tokenId);
+
+  try {
+    const publicKey = await invoke("request", {
+      tokenId: tokenId,
+    });
+
+    message("Public Key: " + publicKey, "request");
+
+  } catch (e) {
+    error("" + e, "request");
+  }
+}
+
+function balanceHtml(actBalance: object): string {
   let balHtml = "";
-  for (let symbol in obj) {
-    balHtml += `<strong>${symbol}</strong>: ${obj[symbol]}, `;
+  for (let tokenId in actBalance) {
+    balHtml += `<strong>${actBalance[tokenId][0]}</strong>: ${actBalance[tokenId][1]}, `;
   }
   return balHtml.substring(0, balHtml.length - 2); // remove last comma
 }
@@ -68,19 +89,36 @@ async function balance() {
   let bal = await invoke("balance");
   console.log(bal);
   if (Array.isArray(bal)) {
-    bal = toHtml({ "ATTOS": bal[0], "WEI": bal[0] });
+    bal = balanceHtml({ "fakeTokenId1": ["ATTOS", bal[0]], "fakeTokenId2": ["WEI", bal[1]] });
   }
   const actBalance = await invoke("act_balances");
   console.log("actBalance");
   console.log(actBalance);
 
+  populateTokenIdSelect(document.querySelector("#request-token-id select"), actBalance);
+
   let actBalanceHtml = "–";
   if (typeof actBalance === 'object' && Object.keys(actBalance).length > 0) {
-    actBalanceHtml = toHtml(actBalance);
+    actBalanceHtml = balanceHtml(actBalance);
   }
   
-  balanceEl.innerHTML = "<dt>EVM balance</dt> <dd>" + bal + "</dd> <br />"
+  balanceEl.innerHTML = "<dt>EVM balance (gas)</dt> <dd>" + bal + "</dd> <br />"
     + "<dt>ACT balance</dt> <dd>" + actBalanceHtml + "</dd>";
+}
+
+function optionHtml(value: string, text: string): Element {
+    let option = document.createElement("option");
+    option.value = value;
+    option.innerHTML = text;
+    return option;
+}
+
+function populateTokenIdSelect(select: Element, actBalance: object) {
+  select.replaceChildren(); // clear
+  select.append(optionHtml("", "(clear)"));
+  for (let tokenId in actBalance) {
+    select.append(optionHtml(tokenId, actBalance[tokenId][0] + " (" + tokenId.substring(0, 6) + "...)"));
+  }
 }
 
 
@@ -98,6 +136,7 @@ function message(text: string, afterId: string) {
     msgEl.hidden = false;
   }
   msgEl.innerHTML = text;
+  console.log(`(${afterId}): ${text}`);
 }
 
 function error(text: string, afterId: string) {
@@ -114,15 +153,20 @@ function error(text: string, afterId: string) {
     errEl.hidden = false;
   }
   errEl.innerHTML = text;
+  console.error(`(${afterId}): ${text}`);
 }
 
 window.addEventListener("DOMContentLoaded", () => {
   document.getElementById("balance").hidden = true;
   refresh();
 
+  // connect
+
   document.querySelector("#main-connect-button")?.addEventListener("click", (e) => connect("Main"));
   document.querySelector("#local-connect-button")?.addEventListener("click", (e) => connect("Local"));
   document.querySelector("#alpha-connect-button")?.addEventListener("click", (e) => connect("Alpha"));
+
+  // menu
 
   let menuButtons = document.querySelectorAll("#menu li");
   for (const button of menuButtons) {
@@ -136,7 +180,18 @@ window.addEventListener("DOMContentLoaded", () => {
       button.setAttribute("class", "active");
     });
   }
-  
+
+  // request
+
+  document.querySelector("#request-token-id select")?.addEventListener("change", (e) => {
+    document.querySelector("#request-token-id input").value = e.target.value;
+  });
+
+  document.querySelector("#request button")?.addEventListener("click", async (e) => {
+    await request();
+  });
+
+  // create token
 
   document.querySelector("#create-token button")?.addEventListener("click", async (e) => {
     await createToken();

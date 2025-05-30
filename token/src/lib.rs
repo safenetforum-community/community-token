@@ -1,6 +1,9 @@
 mod act;
 mod wallet;
 
+pub use wallet::Wallet;
+pub use act::{ActExt, TokenInfo};
+
 
 #[cfg(test)]
 mod tests {
@@ -10,9 +13,6 @@ mod tests {
 
 	use ruint::aliases::U256;
 	use autonomi::{SecretKey, Client, PublicKey, client::payment::PaymentOption, GraphEntry};
-
-	use crate::wallet::Wallet;
-	use crate::act::ActExt;
 
 
 	fn init_logging() {
