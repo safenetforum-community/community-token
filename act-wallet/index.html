@@ -14,10 +14,16 @@
 
     <div id="connect">
       <p>
-        Provide a private key on EVM (Arbitrum/Sepolia/Local) network for payments and access. Leave it empty to generate random account for you.
+        Provide a private key on EVM (Arbitrum/Sepolia/Local) network for payments and access.
       </p>
       <p>
-        <input id="pk-input" placeholder="EVM private key..." value="0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80" size=80 />
+        Or leave it empty to generate random key for you. Store it securely, so you could recover access to your funds. You can treat it as a sort of password. Based on that, a wallet will be created in memory.
+      </p>
+      <p>
+        Also a Secret Key will be generated, which will be used by the wallet to publish spends (transactions). Wallet stores information about your tokens and will be securely stored on Autonomi after each operation. So, without Private Key (which is used to re-create Secret Key), the wallet will not be able to spend your tokens.
+      </p>
+      <p>
+        <input id="pk-input" placeholder="e.g. 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 ..." value="" size=70 />
       </p>
       <p>
         <button id="main-connect-button" type="button">Connect to Mainnet</button>
@@ -59,7 +65,14 @@
 
       <div id="request" class="subpanel">
         <p>
-          Request
+          If you want someone to send you tokens, you have to give them a Public Key to tokens in your wallet. Another one will be created each time you spend your tokens, and left funds will be transfered to this new key.
+        </p>
+        <p id="request-token-id">
+          Token Id: <input placeholder="e.g. 6150aa3c2c43e458a03b773b520ba8aa1f3a3eef6db88ba44b31734932cc1749 ..." value="" size=70 /> <br />
+          (you can select one from what you already have: <select></select> )
+        </p>
+        <p>
+          <button type="button">Request Public Key</button>
         </p>
       </div>
 

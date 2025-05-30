@@ -3,8 +3,9 @@ use futures::{lock::Mutex, stream, StreamExt};
 use ruint::aliases::U256;
 use sn_curv::elliptic::curves::ECScalar;
 use tauri::{State, Manager, Theme};
-use autonomi::{Client, SecretKey, Wallet,
-	client::payment::PaymentOption};
+use autonomi::{Client, SecretKey, Wallet, XorName,
+	client::payment::PaymentOption,
+};
 use ant_act::{ActExt, Wallet as ActWallet, TokenInfo};
 
 
@@ -19,7 +20,7 @@ struct AppState {
 enum Network {Local, Alpha,	Main}
 
 #[tauri::command]
-async fn connect(network: Network, evm_pk: Option<String>, state: State<'_, Mutex<Option<AppState>>>) -> Result<(), String> {
+async fn connect(network: Network, evm_pk: Option<String>, state: State<'_, Mutex<Option<AppState>>>) -> Result<String, String> {
 	let mut state = state.lock().await;
 
 	if state.is_none() {
@@ -45,7 +46,7 @@ async fn connect(network: Network, evm_pk: Option<String>, state: State<'_, Mute
 			hex::decode(evm_pk).map_err(|e| format!("{}", e))?[0..32].try_into().unwrap()
 		).expect("Wrong bytes").serialize().into()).expect("Wrong bytes");
 
-		let act_wallet = ant_act::Wallet::new(sk.clone());
+		let act_wallet = ActWallet::new(sk.public_key());
 
 		*state = Some(AppState {
 			client,
@@ -53,9 +54,12 @@ async fn connect(network: Network, evm_pk: Option<String>, state: State<'_, Mute
 			sk,
 			act_wallet,
 		});
-	}
 
-	Ok(())
+		Ok(evm_pk.to_string())
+
+	} else {
+		Err("Already connected.".to_string())
+	}
 }
 
 #[tauri::command]
@@ -82,7 +86,7 @@ async fn create_token(
 	let with_wallet = PaymentOption::from(evm_wallet);
 
 //	let act_wallet = client.act_wallet(sk);
-	let owner = act_wallet.request(vec![1]);
+	let owner = act_wallet.request(None)?;
 
 	let total_supply = U256::from_str_radix(&total_supply, 10).map_err(|e| format!("{}", e))?;
 	let (genesis_spend, token_id) = client.act_create(
@@ -96,9 +100,22 @@ async fn create_token(
 
 	let received_balance = client.act_balance(&owner, vec![genesis_spend]).await?;
 
-	act_wallet.receive(received_balance, token_id, genesis_spend, vec![1]);
+	act_wallet.receive(received_balance, token_id, genesis_spend, &owner)?;
 
-	Ok(genesis_spend.to_hex())
+	Ok(format!("{:x}", token_id))
+}
+
+#[tauri::command]
+async fn request(token_id: String, state: State<'_, Mutex<Option<AppState>>>) -> Result<String, String> {
+	let mut state_opt = state.lock().await;
+	let state: &mut AppState = state_opt.as_mut().ok_or("Not connected.")?;
+
+	let act_wallet = &mut state.act_wallet;
+
+	let bytes: [u8; 32] = hex::decode(token_id).map_err(|e| format!("{}", e))?
+		.try_into().map_err(|_| "Wrong length".to_string())?;
+
+	act_wallet.request(Some(XorName(bytes))).map(|key| key.to_hex())
 }
 
 #[tauri::command]
@@ -114,9 +131,9 @@ async fn balance(state: State<'_, Mutex<Option<AppState>>>) -> Result<(String, S
 	Ok((ant, eth))
 }
 
-fn describe_balances(results: &Vec<(Result<TokenInfo, String>, Result<U256, String>)>) -> Result<HashMap<String, String>, HashMap<String, String>> {
+fn describe_balances(results: &Vec<(XorName, Result<TokenInfo, String>, Result<U256, String>)>) -> Result<HashMap<String, (String, String)>, HashMap<String, (String, String)>> {
 	results.iter()
-		.fold(Ok(HashMap::<String, String>::new()), |balances_res: Result<HashMap<String, String>, HashMap<String, String>>, (info_res, balance_res)| {
+		.fold(Ok(HashMap::<String, (String, String)>::new()), |balances_res: Result<HashMap<String, (String, String)>, HashMap<String, (String, String)>>, (token_id, info_res, balance_res)| {
 			let entry_res = match info_res {
 				Err(err) => {
 					let len = match balances_res {
@@ -124,8 +141,10 @@ fn describe_balances(results: &Vec<(Result<TokenInfo, String>, Result<U256, Stri
 						Err(ref b) => b.len(),
 					};
 					Err(
-						(format!("({}) {}", len, err),
-						"Token info error".to_string())
+						(format!("{:x}", token_id), (
+							format!("({}) {}", len, err),
+							"Token info error".to_string()
+						))
 					)
 				},
 				Ok(info) => {
@@ -142,8 +161,8 @@ fn describe_balances(results: &Vec<(Result<TokenInfo, String>, Result<U256, Stri
 						});
 
 					match balance_res {
-						Ok(balance) => Ok((info.symbol.clone(), balance)),
-						Err(e) => Err((info.symbol.clone(), e.to_string())),
+						Ok(balance) => Ok((format!("{:x}", token_id), (info.symbol.clone(), balance))),
+						Err(e) => Err((format!("{:x}", token_id), (info.symbol.clone(), e))),
 					}
 				}
 			};
@@ -171,7 +190,7 @@ fn describe_balances(results: &Vec<(Result<TokenInfo, String>, Result<U256, Stri
 }
 
 #[tauri::command]
-async fn act_balances(state: State<'_, Mutex<Option<AppState>>>) -> Result<HashMap<String, String>, String> {
+async fn act_balances(state: State<'_, Mutex<Option<AppState>>>) -> Result<HashMap<String, (String, String)>, String> {
 	let state_opt = state.lock().await;
 	let state = state_opt.as_ref().ok_or("Not connected.")?;
 	let wallet = &state.act_wallet;
@@ -184,11 +203,11 @@ async fn act_balances(state: State<'_, Mutex<Option<AppState>>>) -> Result<HashM
 		.then(|(token_id, balance_res)| async move {
 			let info_res = client.act_token_info(token_id).await;
 
-			(info_res, balance_res.clone())
+			(*token_id, info_res, balance_res.clone())
 		}).collect().await;
 
 	describe_balances(&balances_results)
-		.map_err(|balances_errors: HashMap<String, String>| format!("{:?}", balances_errors))
+		.map_err(|balances_errors: HashMap<String, (String, String)>| format!("{:?}", balances_errors))
 }
 
 
@@ -200,6 +219,7 @@ pub fn run() {
 			connect,
 			is_connected,
 			create_token,
+			request,
 			balance,
 			act_balances,
 		])
