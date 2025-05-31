@@ -1,41 +1,19 @@
-use ruint::aliases::U256;
-use std::collections::HashMap;
-use autonomi::{Client, PublicKey};
-use serde::{Serialize, Deserialize};
+mod act;
+mod wallet;
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct TokenInfo {
-	symbol: String,
-	name: String,
-	decimals: u8,
-}
-
-pub type Wallet = HashMap<DerivationIndex, Vec<(PublicKey, U256)>>;
-// TODO: give index key a name?
-// TODO: optional pubkey ("none" meaning waiting for payment)?
-
-#[derive(Clone, Hash, Eq, PartialEq, Debug, Serialize, Deserialize)]
-struct DerivationIndex(Vec<u8>);
-
-
-trait ActExt {
-	// TODO: token operations
-}
-
-impl ActExt for Client {
-	// TODO: token operations implementation
-}
-
+pub use wallet::Wallet;
+pub use act::{ActExt, TokenInfo};
 
 
 #[cfg(test)]
 mod tests {
-	use sn_curv::elliptic::curves::ECScalar;
-	use autonomi::{SecretKey, Wallet as EvmWallet, Chunk, Bytes, GraphEntry, GraphEntryAddress,
-		client::payment::PaymentOption
-	};
+//	use sn_curv::elliptic::curves::ECScalar;
 	use tracing::Level;
-	use super::*;
+	use autonomi::{Wallet as EvmWallet};
+
+	use ruint::aliases::U256;
+	use autonomi::{SecretKey, Client, PublicKey, client::payment::PaymentOption, GraphEntry};
+
 
 	fn init_logging() {
 		let logging_targets = vec![
@@ -81,180 +59,113 @@ mod tests {
 	#[tokio::test]
 	async fn reads_balance_correctly() -> Result<(), String> {
 //		init_logging();
-		const EVM_PK: &str = "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
+		const EVM_PRIVKEY: &str = "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
 		const DECIMALS: u8 = 18;
-//		let client = init_alpha().await?;
-		let client = Client::init_local()
-			.await.map_err(|e| format!("{}", e))?;
+//		let client = Client::init_alpha()
+		let client = Client::init_local().await
+			.map_err(|e| format!("{}", e))?;
 
-		let evm_wallet = EvmWallet::new_from_private_key(client.evm_network().clone(), EVM_PK)
+		let evm_wallet = EvmWallet::new_from_private_key(client.evm_network().clone(), EVM_PRIVKEY)
 			.map_err(|e| format!("{}", e))?;
 		let with_wallet = PaymentOption::from(evm_wallet.clone());
 		println!("EVM Address: {}", evm_wallet.address());
-		println!("ANT Balance: {}", evm_wallet.balance_of_tokens()
-			.await.map_err(|e| format!("{}", e))?);
-		println!("Gas Balance: {}", evm_wallet.balance_of_gas_tokens()
-			.await.map_err(|e| format!("{}", e))?);
+		println!("ANT Balance: {}", evm_wallet.balance_of_tokens().await
+			.map_err(|e| format!("{}", e))?);
+		println!("Gas Balance: {}", evm_wallet.balance_of_gas_tokens().await
+			.map_err(|e| format!("{}", e))?);
 
-//		let sk = SecretKey::random();
-		let sk = SecretKey::from_bytes(sn_bls_ckd::derive_master_sk(
-			hex::decode(EVM_PK).map_err(|e| format!("{}", e))?[0..32].try_into().unwrap()
-		).expect("Wrong bytes").serialize().into()).expect("Wrong bytes");
+		let sk1 = SecretKey::random();
+		let sk2 = SecretKey::random();
+//		let sk = SecretKey::from_bytes(sn_bls_ckd::derive_master_sk(
+//			hex::decode(EVM_PRIVKEY).map_err(|e| format!("{}", e))?[0..32].try_into().unwrap()
+//		).expect("Wrong bytes").serialize().into()).expect("Wrong bytes");
 
-		let index = DerivationIndex(vec![1]);
-		let issuer_sk = sk.derive_child(&index.0);
-		let issuer_key = issuer_sk.public_key();
-		println!("Issuer BLS SecretKey: {:.4}(...)", issuer_sk.to_hex());
-		println!("Issuer Derived PublicKey: {:.4}(...), {:?}", issuer_key.to_hex(), issuer_key);
 
-		// create token info chunk
+		// TODO: read wallet from scratchpad
 
-		let token_info = Chunk::new(Bytes::from(serde_json::to_string(&TokenInfo {
-			symbol: "AANT".into(),
-			name: "Alternative Autonomi Network Token".into(),
-			decimals: DECIMALS,
-		}).map_err(|e| format!("{}", e))?));
-		let (_paid, token_info_address) = client.chunk_put(&token_info, with_wallet.clone())
-			.await.map_err(|e| format!("{}", e))?;
+		let mut wallet1 = Wallet::new(sk1.public_key());
+		let issuer_key = wallet1.request(None)?;
+		println!("Wallet1: {:?}", wallet1);
 
-		println!("TokenInfo Chunk: {}", token_info_address);
-
-		// create genesis tx with output to given key
-
+		let symbol = "EACT";
 		let total_supply: U256 = amount(1_000_000, DECIMALS);
-		let genesis_owner = SecretKey::random();
-		let genesis_owner_pubkey = genesis_owner.public_key();
-		let genesis = GraphEntry::new(
-			&genesis_owner,
-			vec![],
-			token_info_address.xorname().clone().0,
-			vec![(issuer_key, total_supply.to_be_bytes())] // all output to issuer
-		);
-		let (_paid, genesis_address) = client.graph_entry_put(genesis, with_wallet.clone())
-			.await.map_err(|e| format!("{}", e))?;
-
-		println!("Genesis GraphEntry: {}", genesis_address);
-		assert_eq!(&genesis_owner_pubkey, genesis_address.owner());
+		let (genesis_spend, token_id) = client.act_create(
+			"Example Autonomi Community Token".into(),
+			symbol.into(),
+			DECIMALS,
+			total_supply,
+			issuer_key,
+			&with_wallet,
+		).await?;
 
 		// populate wallet struct
 
-		let mut wallet = Wallet::new();
-		match wallet.get_mut(&index) {
-			Some(transactions) => {
-				transactions.push((*genesis_address.owner(), total_supply));
-			},
-			None => {
-				wallet.insert(index, vec![(*genesis_address.owner(), total_supply)]);
-			}
-		};
-
-		println!("Wallet: {:?}", wallet);
+		wallet1.receive(total_supply, token_id, genesis_spend, &issuer_key)?;
+		println!("Wallet1: {:?}", wallet1);
 
 		// TODO: save wallet to scratchpad
 
 		// check balance on that key
 
-		let tx = client.graph_entry_get(&GraphEntryAddress::new(*genesis_address.owner()))
-			.await.map_err(|e| format!("{}", e))?;
-		let (balance, overflow) = tx.descendants.iter()
-			.filter(|(pubkey, _data)| pubkey == &issuer_key)
-			.map(|(_pubkey, data)| U256::from_be_bytes(*data))
-			.fold((U256::from(0), false), |(sum, any_overflow), n| {
-				let (sum, this_overflow) = sum.overflowing_add(n);
-				(sum, any_overflow || this_overflow)
-			});
-		
-		println!("ACT Token issuer Balance: {}", balance);
-		assert!(!overflow); // TODO: error/result
-		assert_eq!(total_supply, balance);
+		let balance_validation = client.act_balance(&issuer_key, vec![genesis_spend]).await?;
+		println!("ACT Token issuer Balance: {}", balance_validation);
+		assert_eq!(total_supply, balance_validation);
+		assert_eq!(total_supply, wallet1.balance(token_id)?);
+
+		let balance_total = wallet1.balance_total();
+		println!("Wallet1 balance_total: {:?}", balance_total);
+		assert_eq!(1, balance_total.len());
+		assert_eq!(total_supply, balance_total.get(&token_id).expect("Wrong token_id").clone()?);
+
+		let token_info = client.act_token_info(&token_id).await?;
+		println!("ACT Token symbol: {}", token_info.symbol);
+		assert_eq!(symbol, token_info.symbol);
 
 		// request payment
 
-		let receive_amount = amount(200, DECIMALS);
-
-		let receive_index = DerivationIndex(vec![2]);
-		let receiver_sk = sk.derive_child(&receive_index.0);
-		let receiver_key = receiver_sk.public_key();
-		println!("Receiver BLS SecretKey: {:.4}(...)", receiver_sk.to_hex());
-		println!("Receiver Derived PublicKey: {:.4}(...), {:?}", receiver_key.to_hex(), receiver_key);
-
-		if wallet.get(&receive_index).is_none() {
-			wallet.insert(receive_index.clone(), vec![]);
-		}
-
-		println!("Wallet: {:?}", wallet);
-
-		// prepare rest output
-
-		let rest_index = DerivationIndex(vec![3]);
-		let rest_sk = sk.derive_child(&rest_index.0);
-		let rest_key = rest_sk.public_key();
-		println!("Rest BLS SecretKey: {:.4}(...)", rest_sk.to_hex());
-		println!("Rest Derived PublicKey: {:.4}(...), {:?}", rest_key.to_hex(), rest_key);
-
-		if wallet.get(&rest_index).is_none() {
-			wallet.insert(rest_index.clone(), vec![]);
-		}
-
-		println!("Wallet: {:?}", wallet);
+		let mut wallet2 = Wallet::new(sk2.public_key());
+		let receive_key = wallet2.request(Some(token_id))?;
+		println!("Wallet2: {:?}", wallet2);
 
 		// spend
 
-		let inputs_amounts = wallet.remove(&DerivationIndex(vec![1])).expect("There should be inputs");
-		let (mut inputs, sum, overflow) = inputs_amounts.iter()
-			.fold(
-				(Vec::<PublicKey>::new(), U256::from(0), false),
-				|(mut inputs, sum, any_overflow), (input, amount)| {
-					println!("Ipnut: {:?}", (input, amount));
-					let (sum, this_overflow) = sum.overflowing_add(*amount);
-					inputs.push(*input);
-					(inputs, sum, any_overflow || this_overflow)
-				}
-			);
-		assert!(!overflow); // TODO: error/result
-		inputs.insert(0, *genesis_address.owner());
-		println!("Inputs: {:?}", (&inputs, sum, overflow));
+		let receive_amount = amount(200, DECIMALS);
 
-		let rest_amount = sum.checked_sub(receive_amount).unwrap();
+		let issuer_sk = sk1.derive_child(
+			&wallet1.find(issuer_key)
+				.ok_or("Key not found".to_string())?
+				.to_be_bytes::<32>()
+		);
+
+		let (inputs, sum, rest_key) = wallet1.take_to_spend(token_id)?;
+		println!("Inputs: {:?}", (&inputs, sum));
+		let rest_amount = sum.checked_sub(receive_amount)
+			.ok_or("Overflow".to_string())?;
+
 		let spend = GraphEntry::new(
 			&issuer_sk,
 			inputs,
-			token_info_address.xorname().clone().0,
+			token_id.0,
 			vec![
-				(receiver_key, receive_amount.to_be_bytes()),
+				(receive_key, receive_amount.to_be_bytes()),
 				(rest_key, rest_amount.to_be_bytes())
 			] // all output to issuer
 		);
-		let (_paid, spend_address) = client.graph_entry_put(spend, with_wallet.clone())
-			.await.map_err(|e| format!("{}", e))?;
+		let (_paid, spend_address) = client.graph_entry_put(spend, with_wallet.clone()).await
+			.map_err(|e| format!("{}", e))?;
 
 		println!("Spend GraphEntry: {}", spend_address);
 		assert_eq!(&issuer_key, spend_address.owner());
 
-		match wallet.get_mut(&rest_index) {
-			Some(transactions) => {
-				transactions.push((*spend_address.owner(), rest_amount));
-			},
-			None => {
-				wallet.insert(rest_index.clone(), vec![(*spend_address.owner(), rest_amount)]);
-			}
-		};
-
-		// receive
-
-		match wallet.get_mut(&receive_index) {
-			Some(transactions) => {
-				transactions.push((*spend_address.owner(), receive_amount));
-			},
-			None => {
-				wallet.insert(receive_index.clone(), vec![(*spend_address.owner(), rest_amount)]);
-			}
-		};
-
-		println!("Wallet: {:?}", wallet);
+		wallet1.receive(rest_amount, token_id, *spend_address.owner(), &rest_key)?;
+		println!("Wallet1: {:?}", wallet1);
+		wallet2.receive(receive_amount, token_id, *spend_address.owner(), &receive_key)?;
+		println!("Wallet2: {:?}", wallet2);
 
 		Ok(())
 	}
+
+	// TODO: de/serialze wallet
 
 	#[test]
 	fn pk_cannot_be_arbitrary_32bytes() -> Result<(), String> {
@@ -274,10 +185,20 @@ mod tests {
 	}
 
 	#[test]
-	fn can_reference_erc20() -> Result<(), String> {
-		// TODO
-		assert_eq!(0, 0);
+	fn pubkey_from_derived_sk_equals_derived_pubkey() {
+		let index = "index1_abcdef";
+		println!("index: {:?}", index);
+		let sk = SecretKey::random();
+		println!("sk: {:?}", sk);
+		let pk = sk.public_key();
+		println!("pk: {:?}", pk);
 
-		Ok(())
+		let pubkey_from_derived_sk = sk.derive_child(index.as_bytes()).public_key();
+		println!("pubkey_from_derived_sk: {:?}", pubkey_from_derived_sk);
+		let derived_pubkey = pk.derive_child(index.as_bytes());
+		println!("derived_pubkey: {:?}", derived_pubkey);
+
+		assert_eq!(pubkey_from_derived_sk, derived_pubkey);
 	}
+
 }
