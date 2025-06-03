@@ -29,16 +29,16 @@ async function connect(network: string) {
 }
 
 async function createToken() {
-  const nameInputEl = document.querySelector("#create-token #name input");
+  const nameInputEl = document.querySelector("#create-token-name input");
   const name = nameInputEl.value;
   
-  const symbolInputEl = document.querySelector("#create-token #symbol input");
+  const symbolInputEl = document.querySelector("#create-token-symbol input");
   const symbol = symbolInputEl.value;
   
-  const supplyInputEl = document.querySelector("#create-token #supply input");
+  const supplyInputEl = document.querySelector("#create-token-supply input");
   const supply = supplyInputEl.value;
 
-  const decimalsInputEl = document.querySelector("#create-token #decimals input");
+  const decimalsInputEl = document.querySelector("#create-token-decimals input");
   const decimals = decimalsInputEl.value;
 
   try {
@@ -51,11 +51,10 @@ async function createToken() {
 
     message("Token ID: " + tokenId, "create-token");
 
-    await balance();
-
   } catch (e) {
     error("" + e, "create-token");
   }
+  await balance();
 }
 
 async function request() {
@@ -72,6 +71,43 @@ async function request() {
   } catch (e) {
     error("" + e, "request");
   }
+  await balance();
+}
+
+async function pay() {
+  const tokenId = document.querySelector("#pay-token-id input")?.value;
+  const amount = document.querySelector("#pay-amount input")?.value;
+  const to = document.querySelector("#pay-to input")?.value;
+
+  try {
+    const spendAddress = await invoke("pay", {
+      tokenId: tokenId,
+      amount: amount,
+      to: to,
+    });
+
+    message("Crated spend: " + spendAddress, "pay");
+
+  } catch (e) {
+    error("" + e, "pay");
+  }
+  await balance();
+}
+
+async function receive() {
+  const spendAddress = document.querySelector("#receive-spend input")?.value;
+
+  try {
+    await invoke("receive", {
+      spendAddress: spendAddress,
+    });
+
+    message("Tokens received.", "receive");
+
+  } catch (e) {
+    error("" + e, "receive");
+  }
+  await balance();
 }
 
 function balanceHtml(actBalance: object): string {
@@ -96,6 +132,7 @@ async function balance() {
   console.log(actBalance);
 
   populateTokenIdSelect(document.querySelector("#request-token-id select"), actBalance);
+  populateTokenIdSelect(document.querySelector("#pay-token-id select"), actBalance);
 
   let actBalanceHtml = "–";
   if (typeof actBalance === 'object' && Object.keys(actBalance).length > 0) {
@@ -134,9 +171,9 @@ function message(text: string, afterId: string) {
   } else {
     error("", afterId);
     msgEl.hidden = false;
+    console.log(`(${afterId}): ${text}`);
   }
   msgEl.innerHTML = text;
-  console.log(`(${afterId}): ${text}`);
 }
 
 function error(text: string, afterId: string) {
@@ -151,9 +188,9 @@ function error(text: string, afterId: string) {
   } else {
     message("", afterId);
     errEl.hidden = false;
+    console.error(`(${afterId}): ${text}`);
   }
   errEl.innerHTML = text;
-  console.error(`(${afterId}): ${text}`);
 }
 
 window.addEventListener("DOMContentLoaded", () => {
@@ -189,6 +226,22 @@ window.addEventListener("DOMContentLoaded", () => {
 
   document.querySelector("#request button")?.addEventListener("click", async (e) => {
     await request();
+  });
+
+  // pay
+
+  document.querySelector("#pay-token-id select")?.addEventListener("change", (e) => {
+    document.querySelector("#pay-token-id input").value = e.target.value;
+  });
+
+  document.querySelector("#pay button")?.addEventListener("click", async (e) => {
+    await pay();
+  });
+
+  // receive
+
+  document.querySelector("#receive button")?.addEventListener("click", async (e) => {
+    await receive();
   });
 
   // create token

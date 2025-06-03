@@ -1,7 +1,7 @@
 mod act;
 mod wallet;
 
-pub use wallet::Wallet;
+pub use wallet::{WalletExt, Wallet};
 pub use act::{ActExt, TokenInfo};
 
 
@@ -13,6 +13,8 @@ mod tests {
 
 	use ruint::aliases::U256;
 	use autonomi::{SecretKey, Client, PublicKey, client::payment::PaymentOption, GraphEntry};
+
+	use crate::*;
 
 
 	fn init_logging() {
@@ -35,21 +37,6 @@ mod tests {
 			.initialize().expect("Init logging");
 	}
 
-	async fn init_alpha() -> Result<Client, String> {
-		let client_config = autonomi::ClientConfig {
-			init_peers_config: autonomi::InitialPeersConfig {
-				network_contacts_url: vec!["http://146.190.225.26/bootstrap_cache.json".to_string()],
-				disable_mainnet_contacts: true,
-				..Default::default()
-			},
-			evm_network: autonomi::Network::ArbitrumSepoliaTest,
-			strategy: Default::default(),
-			network_id: Some(2),
-		};
-		Client::init_with_config(client_config)
-			.await.map_err(|e| format!("{}", e))
-	}
-
 	fn amount(n: u64, decimals: u8) -> U256 {
 		U256::from(n).checked_mul(
 			U256::from(10).checked_pow(U256::from(decimals)).expect("U256 Overflow") // TODO: error/result
@@ -61,8 +48,8 @@ mod tests {
 //		init_logging();
 		const EVM_PRIVKEY: &str = "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
 		const DECIMALS: u8 = 18;
-//		let client = Client::init_alpha()
-		let client = Client::init_local().await
+//		let mut client = Client::init_alpha().await
+		let mut client = Client::init_local().await
 			.map_err(|e| format!("{}", e))?;
 
 		let evm_wallet = EvmWallet::new_from_private_key(client.evm_network().clone(), EVM_PRIVKEY)
@@ -76,6 +63,7 @@ mod tests {
 
 		let sk1 = SecretKey::random();
 		let sk2 = SecretKey::random();
+		let pk2 = sk2.public_key();
 //		let sk = SecretKey::from_bytes(sn_bls_ckd::derive_master_sk(
 //			hex::decode(EVM_PRIVKEY).map_err(|e| format!("{}", e))?[0..32].try_into().unwrap()
 //		).expect("Wrong bytes").serialize().into()).expect("Wrong bytes");
@@ -83,8 +71,15 @@ mod tests {
 
 		// TODO: read wallet from scratchpad
 
-		let mut wallet1 = Wallet::new(sk1.public_key());
+		let mut wallet1 = client.act_wallet_get(&sk1).await?
+			.unwrap_or(Wallet::new(sk1.public_key()));
+		println!("Wallet1: {:?}", wallet1);
+
 		let issuer_key = wallet1.request(None)?;
+		println!("saving...");
+		let _ = client.act_wallet_save(&wallet1, &sk1, &with_wallet).await?;
+		println!("getting...");
+		let mut wallet1 = client.act_wallet_get(&sk1).await?.expect("Wallet1 expected in storage");
 		println!("Wallet1: {:?}", wallet1);
 
 		let symbol = "EACT";
@@ -100,10 +95,8 @@ mod tests {
 
 		// populate wallet struct
 
-		wallet1.receive(total_supply, token_id, genesis_spend, &issuer_key)?;
+		wallet1.receive(total_supply, token_id, genesis_spend)?;
 		println!("Wallet1: {:?}", wallet1);
-
-		// TODO: save wallet to scratchpad
 
 		// check balance on that key
 
@@ -123,8 +116,13 @@ mod tests {
 
 		// request payment
 
-		let mut wallet2 = Wallet::new(sk2.public_key());
+		let mut wallet2 = client.act_wallet_get(&sk2).await?
+			.unwrap_or(Wallet::new(pk2.clone()));
+		println!("Wallet2: {:?}", wallet2);
+
 		let receive_key = wallet2.request(Some(token_id))?;
+		let _ = client.act_wallet_save(&wallet2, &sk2, &with_wallet).await?;
+		let mut wallet2 = client.act_wallet_get(&sk2).await?.expect("Wallet2 expected in storage");
 		println!("Wallet2: {:?}", wallet2);
 
 		// spend
@@ -132,13 +130,15 @@ mod tests {
 		let receive_amount = amount(200, DECIMALS);
 
 		let issuer_sk = sk1.derive_child(
-			&wallet1.find(issuer_key)
-				.ok_or("Key not found".to_string())?
+			&wallet1.index_of_token(token_id)
+				.ok_or("Token id not found".to_string())?
 				.to_be_bytes::<32>()
 		);
 
 		let (inputs, sum, rest_key) = wallet1.take_to_spend(token_id)?;
 		println!("Inputs: {:?}", (&inputs, sum));
+		println!("Wallet1: {:?}", wallet1);
+
 		let rest_amount = sum.checked_sub(receive_amount)
 			.ok_or("Overflow".to_string())?;
 
@@ -157,9 +157,14 @@ mod tests {
 		println!("Spend GraphEntry: {}", spend_address);
 		assert_eq!(&issuer_key, spend_address.owner());
 
-		wallet1.receive(rest_amount, token_id, *spend_address.owner(), &rest_key)?;
+		wallet1.receive(rest_amount, token_id, *spend_address.owner())?;
+		let _ = client.act_wallet_save(&wallet1, &sk1, &with_wallet).await?;
+		let wallet1 = client.act_wallet_get(&sk1).await?.expect("Wallet1 expected in storage");
 		println!("Wallet1: {:?}", wallet1);
-		wallet2.receive(receive_amount, token_id, *spend_address.owner(), &receive_key)?;
+
+		wallet2.receive(receive_amount, token_id, *spend_address.owner())?;
+		let _ = client.act_wallet_save(&wallet2, &sk2, &with_wallet).await?;
+		let wallet2 = client.act_wallet_get(&sk2).await?.expect("Wallet2 expected in storage");
 		println!("Wallet2: {:?}", wallet2);
 
 		Ok(())

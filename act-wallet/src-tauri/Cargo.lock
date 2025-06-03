@@ -826,15 +826,15 @@ dependencies = [
 name = "ant-act"
 version = "0.0.1"
 dependencies = [
- "ant-logging",
+ "ant-networking",
  "autonomi",
  "futures",
+ "rmp-serde",
  "ruint",
  "serde",
  "serde_json",
  "sn_bls_ckd",
  "sn_curv",
- "tracing",
 ]
 
 [[package]]

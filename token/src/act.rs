@@ -22,7 +22,7 @@ pub trait ActExt {
 		payment: &PaymentOption,
 	) -> impl Future<Output = Result<(PublicKey, XorName), String>> + Send;
 
-	fn unspent(&self, pubkey: &PublicKey, spend: PublicKey) -> impl Future<Output = Result<U256, String>> + Send;
+	fn act_unspent(&self, pubkey: &PublicKey, spend: PublicKey) -> impl Future<Output = Result<(XorName, U256), String>> + Send;
 
 	fn act_balance(&self, pubkey: &PublicKey, spends: Vec<PublicKey>) -> impl Future<Output = Result<U256, String>> + Send;
 
@@ -57,8 +57,6 @@ impl ActExt for Client {
 		let token_id = token_info_address.xorname();
 		println!("TokenId: {}", token_id);
 
-		// create genesis tx with output to given key
-
 		let genesis_owner = SecretKey::random();
 		println!("Genesis owner: {:?}", genesis_owner);
 
@@ -80,13 +78,13 @@ impl ActExt for Client {
 		Ok((genesis_spend, *token_id))
 	}
 
-	async fn unspent(&self, pubkey: &PublicKey, spend: PublicKey) -> Result<U256, String> {
+	async fn act_unspent(&self, output: &PublicKey, spend: PublicKey) -> Result<(XorName, U256), String> {
 
 		let tx = self.graph_entry_get(&GraphEntryAddress::new(spend))
 			.await.map_err(|e| format!("{}", e))?;
 
 		let (balance, overflow) = tx.descendants.iter()
-			.filter(|(pk, _data)| pk == pubkey)
+			.filter(|(pk, _data)| pk == output)
 			.map(|(_pk, data)| U256::from_be_bytes(*data))
 			.fold((U256::ZERO, false), |(sum, any_overflow), n| {
 				let (added, this_overflow) = sum.overflowing_add(n);
@@ -94,7 +92,7 @@ impl ActExt for Client {
 			});
 
 		match overflow {
-			false => Ok(balance),
+			false => Ok((XorName(tx.content), balance)),
 			true => Err("Overflow.".into()),
 		}
 	}
@@ -103,7 +101,7 @@ impl ActExt for Client {
 		let stream = stream::iter(spends);
 
 		stream.fold(Ok(U256::ZERO), |sum_res, spend_pk| async move {
-			let unsp = self.unspent(pubkey, spend_pk).await?;
+			let (_token_id, unsp) = self.act_unspent(pubkey, spend_pk).await?;
 
 			match sum_res?.overflowing_add(unsp) {
 				(added, false) => Ok(added),

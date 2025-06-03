@@ -63,9 +63,10 @@
         <li data-targetid="create-token">Create Token</li>
       </ul>
 
+
       <div id="request" class="subpanel">
         <p>
-          If you want someone to send you tokens, you have to give them a Public Key to tokens in your wallet. Another one will be created each time you spend your tokens, and left funds will be transfered to this new key.
+          If you want someone to send you tokens, you have to give them a Public Key to tokens in your wallet. A new one will be created each time you spend your tokens, and left funds will be transfered to this new key, so remember to always give fresh key to the payer.
         </p>
         <p id="request-token-id">
           Token Id: <input placeholder="e.g. 6150aa3c2c43e458a03b773b520ba8aa1f3a3eef6db88ba44b31734932cc1749 ..." value="" size=70 /> <br />
@@ -76,29 +77,52 @@
         </p>
       </div>
 
+
       <div id="pay" class="subpanel" hidden>
         <p>
-          Pay
+          Wallet doesn't support sending tokens to itself.
+        </p>
+        <p id="pay-token-id">
+          Token Id: <input placeholder="e.g. 6150aa3c2c43e458a03b773b520ba8aa1f3a3eef6db88ba44b31734932cc1749 ..." value="" size=70 /> <br />
+          (you can select one from what you already have: <select></select> )
+        </p>
+        <p id="pay-amount">
+          Amount: <input placeholder="e.g. 1_000_000.0005 ..." value="" size=30 />
+        </p>
+        <p id="pay-to">
+          To (public key):  <input placeholder="e.g. 800153cc9587e0d5bdd8d885a786600dfdb87ef728bfcddf81126178ae7a83010675acc59dea31033903ad3163ed6d16 ..." value="" size=70 />
+        </p>
+        <p>
+          <button type="button">Make payment</button>
         </p>
       </div>
+
 
       <div id="receive" class="subpanel" hidden>
         <p>
-          Receive
+          A Spend was created during payment. To save funds in your wallet, enter the address.
+        </p>
+        <p id="receive-spend">
+          Spend address:  <input placeholder="e.g. 800153cc9587e0d5bdd8d885a786600dfdb87ef728bfcddf81126178ae7a83010675acc59dea31033903ad3163ed6d16 ..." value="" size=70 />
+        </p>
+        <p>
+          <button type="button">Receive tokens</button>
+<!--          // TODO: validate-->
         </p>
       </div>
 
+
       <div id="create-token" class="subpanel" hidden>
-        <p id="name">
+        <p id="create-token-name">
           Token name: <input placeholder="e.g. David Irvine Memecoin..." value="" size=60 />
         </p>
-        <p id="symbol">
+        <p id="create-token-symbol">
           Symbol: <input placeholder="e.g. IRVINE..." value="" size=10 />
         </p>
-        <p id="supply">
+        <p id="create-token-supply">
           Total Supply: <input placeholder="e.g. 100_000_000_123_456_789_123_456_789..." value="" size=40 />
         </p>
-        <p id="decimals">
+        <p id="create-token-decimals">
           Decimal places: <input placeholder="e.g. 18..." value="18" size=10 /> <br />
         </p>
         <p>
