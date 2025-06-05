@@ -1,209 +1,248 @@
 mod act;
 mod wallet;
 
-pub use wallet::{WalletExt, Wallet};
 pub use act::{ActExt, TokenInfo};
-
+pub use wallet::{Wallet, WalletExt};
 
 #[cfg(test)]
 mod tests {
-//	use sn_curv::elliptic::curves::ECScalar;
-	use tracing::Level;
-	use autonomi::{Wallet as EvmWallet};
+    //	use sn_curv::elliptic::curves::ECScalar;
+    use autonomi::Wallet as EvmWallet;
+    use tracing::Level;
 
-	use ruint::aliases::U256;
-	use autonomi::{SecretKey, Client, PublicKey, client::payment::PaymentOption, GraphEntry};
+    use autonomi::{client::payment::PaymentOption, Client, GraphEntry, PublicKey, SecretKey};
+    use ruint::aliases::U256;
 
-	use crate::*;
+    use crate::*;
 
+    fn init_logging() {
+        let logging_targets = vec![
+            ("ant_bootstrap".to_string(), Level::INFO),
+            ("ant_build_info".to_string(), Level::TRACE),
+            ("ant_evm".to_string(), Level::TRACE),
+            ("ant_networking".to_string(), Level::INFO),
+            ("autonomi_cli".to_string(), Level::TRACE),
+            ("autonomi".to_string(), Level::TRACE),
+            ("evmlib".to_string(), Level::TRACE),
+            ("ant_logging".to_string(), Level::TRACE),
+            ("ant_protocol".to_string(), Level::TRACE),
+            ("ant_cli".to_string(), Level::TRACE),
+        ];
+        let mut log_builder = ant_logging::LogBuilder::new(logging_targets);
+        log_builder.output_dest(ant_logging::LogOutputDest::Stdout);
+        log_builder.format(ant_logging::LogFormat::Default);
+        let (_, _) = log_builder.initialize().expect("Init logging");
+    }
 
-	fn init_logging() {
-		let logging_targets = vec![
-			("ant_bootstrap".to_string(), Level::INFO),
-			("ant_build_info".to_string(), Level::TRACE),
-			("ant_evm".to_string(), Level::TRACE),
-			("ant_networking".to_string(), Level::INFO),
-			("autonomi_cli".to_string(), Level::TRACE),
-			("autonomi".to_string(), Level::TRACE),
-			("evmlib".to_string(), Level::TRACE),
-			("ant_logging".to_string(), Level::TRACE),
-			("ant_protocol".to_string(), Level::TRACE),
-			("ant_cli".to_string(), Level::TRACE),
-		];
-		let mut log_builder = ant_logging::LogBuilder::new(logging_targets);
-		log_builder.output_dest(ant_logging::LogOutputDest::Stdout);
-		log_builder.format(ant_logging::LogFormat::Default);
-		let (_, _) = log_builder
-			.initialize().expect("Init logging");
-	}
+    fn amount(n: u64, decimals: u8) -> U256 {
+        U256::from(n)
+            .checked_mul(
+                U256::from(10)
+                    .checked_pow(U256::from(decimals))
+                    .expect("U256 Overflow"), // TODO: error/result
+            )
+            .expect("U256 Overflow")
+    }
 
-	fn amount(n: u64, decimals: u8) -> U256 {
-		U256::from(n).checked_mul(
-			U256::from(10).checked_pow(U256::from(decimals)).expect("U256 Overflow") // TODO: error/result
-		).expect("U256 Overflow")
-	}
+    #[tokio::test]
+    async fn reads_balance_correctly() -> Result<(), String> {
+        //		init_logging();
+        const EVM_PRIVKEY: &str =
+            "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
+        const DECIMALS: u8 = 18;
+        //		let mut client = Client::init_alpha().await
+        let mut client = Client::init_local().await.map_err(|e| format!("{}", e))?;
 
-	#[tokio::test]
-	async fn reads_balance_correctly() -> Result<(), String> {
-//		init_logging();
-		const EVM_PRIVKEY: &str = "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
-		const DECIMALS: u8 = 18;
-//		let mut client = Client::init_alpha().await
-		let mut client = Client::init_local().await
-			.map_err(|e| format!("{}", e))?;
+        let evm_wallet = EvmWallet::new_from_private_key(client.evm_network().clone(), EVM_PRIVKEY)
+            .map_err(|e| format!("{}", e))?;
+        let with_wallet = PaymentOption::from(evm_wallet.clone());
+        println!("EVM Address: {}", evm_wallet.address());
+        println!(
+            "ANT Balance: {}",
+            evm_wallet
+                .balance_of_tokens()
+                .await
+                .map_err(|e| format!("{}", e))?
+        );
+        println!(
+            "Gas Balance: {}",
+            evm_wallet
+                .balance_of_gas_tokens()
+                .await
+                .map_err(|e| format!("{}", e))?
+        );
 
-		let evm_wallet = EvmWallet::new_from_private_key(client.evm_network().clone(), EVM_PRIVKEY)
-			.map_err(|e| format!("{}", e))?;
-		let with_wallet = PaymentOption::from(evm_wallet.clone());
-		println!("EVM Address: {}", evm_wallet.address());
-		println!("ANT Balance: {}", evm_wallet.balance_of_tokens().await
-			.map_err(|e| format!("{}", e))?);
-		println!("Gas Balance: {}", evm_wallet.balance_of_gas_tokens().await
-			.map_err(|e| format!("{}", e))?);
+        let sk1 = SecretKey::random();
+        let sk2 = SecretKey::random();
+        let pk2 = sk2.public_key();
+        //		let sk = SecretKey::from_bytes(sn_bls_ckd::derive_master_sk(
+        //			hex::decode(EVM_PRIVKEY).map_err(|e| format!("{}", e))?[0..32].try_into().unwrap()
+        //		).expect("Wrong bytes").serialize().into()).expect("Wrong bytes");
 
-		let sk1 = SecretKey::random();
-		let sk2 = SecretKey::random();
-		let pk2 = sk2.public_key();
-//		let sk = SecretKey::from_bytes(sn_bls_ckd::derive_master_sk(
-//			hex::decode(EVM_PRIVKEY).map_err(|e| format!("{}", e))?[0..32].try_into().unwrap()
-//		).expect("Wrong bytes").serialize().into()).expect("Wrong bytes");
+        // TODO: read wallet from scratchpad
 
+        let mut wallet1 = client
+            .act_wallet_get(&sk1)
+            .await?
+            .unwrap_or(Wallet::new(sk1.public_key()));
+        println!("Wallet1: {:?}", wallet1);
 
-		// TODO: read wallet from scratchpad
+        let issuer_key = wallet1.request(None)?;
+        println!("saving...");
+        let _ = client.act_wallet_save(&wallet1, &sk1, &with_wallet).await?;
+        println!("getting...");
+        let mut wallet1 = client
+            .act_wallet_get(&sk1)
+            .await?
+            .expect("Wallet1 expected in storage");
+        println!("Wallet1: {:?}", wallet1);
 
-		let mut wallet1 = client.act_wallet_get(&sk1).await?
-			.unwrap_or(Wallet::new(sk1.public_key()));
-		println!("Wallet1: {:?}", wallet1);
+        let symbol = "EACT";
+        let total_supply: U256 = amount(1_000_000, DECIMALS);
+        let (genesis_spend, token_id) = client
+            .act_create(
+                "Example Autonomi Community Token".into(),
+                symbol.into(),
+                DECIMALS,
+                total_supply,
+                issuer_key,
+                &with_wallet,
+            )
+            .await?;
 
-		let issuer_key = wallet1.request(None)?;
-		println!("saving...");
-		let _ = client.act_wallet_save(&wallet1, &sk1, &with_wallet).await?;
-		println!("getting...");
-		let mut wallet1 = client.act_wallet_get(&sk1).await?.expect("Wallet1 expected in storage");
-		println!("Wallet1: {:?}", wallet1);
+        // populate wallet struct
 
-		let symbol = "EACT";
-		let total_supply: U256 = amount(1_000_000, DECIMALS);
-		let (genesis_spend, token_id) = client.act_create(
-			"Example Autonomi Community Token".into(),
-			symbol.into(),
-			DECIMALS,
-			total_supply,
-			issuer_key,
-			&with_wallet,
-		).await?;
+        wallet1.receive(total_supply, token_id, genesis_spend)?;
+        println!("Wallet1: {:?}", wallet1);
 
-		// populate wallet struct
+        // check balance on that key
 
-		wallet1.receive(total_supply, token_id, genesis_spend)?;
-		println!("Wallet1: {:?}", wallet1);
+        let balance_validation = client.act_balance(&issuer_key, vec![genesis_spend]).await?;
+        println!("ACT Token issuer Balance: {}", balance_validation);
+        assert_eq!(total_supply, balance_validation);
+        assert_eq!(total_supply, wallet1.balance(token_id)?);
 
-		// check balance on that key
+        let balance_total = wallet1.balance_total();
+        println!("Wallet1 balance_total: {:?}", balance_total);
+        assert_eq!(1, balance_total.len());
+        assert_eq!(
+            total_supply,
+            balance_total
+                .get(&token_id)
+                .expect("Wrong token_id")
+                .clone()?
+        );
 
-		let balance_validation = client.act_balance(&issuer_key, vec![genesis_spend]).await?;
-		println!("ACT Token issuer Balance: {}", balance_validation);
-		assert_eq!(total_supply, balance_validation);
-		assert_eq!(total_supply, wallet1.balance(token_id)?);
+        let token_info = client.act_token_info(&token_id).await?;
+        println!("ACT Token symbol: {}", token_info.symbol);
+        assert_eq!(symbol, token_info.symbol);
 
-		let balance_total = wallet1.balance_total();
-		println!("Wallet1 balance_total: {:?}", balance_total);
-		assert_eq!(1, balance_total.len());
-		assert_eq!(total_supply, balance_total.get(&token_id).expect("Wrong token_id").clone()?);
+        // request payment
 
-		let token_info = client.act_token_info(&token_id).await?;
-		println!("ACT Token symbol: {}", token_info.symbol);
-		assert_eq!(symbol, token_info.symbol);
+        let mut wallet2 = client
+            .act_wallet_get(&sk2)
+            .await?
+            .unwrap_or(Wallet::new(pk2.clone()));
+        println!("Wallet2: {:?}", wallet2);
 
-		// request payment
+        let receive_key = wallet2.request(Some(token_id))?;
+        let _ = client.act_wallet_save(&wallet2, &sk2, &with_wallet).await?;
+        let mut wallet2 = client
+            .act_wallet_get(&sk2)
+            .await?
+            .expect("Wallet2 expected in storage");
+        println!("Wallet2: {:?}", wallet2);
 
-		let mut wallet2 = client.act_wallet_get(&sk2).await?
-			.unwrap_or(Wallet::new(pk2.clone()));
-		println!("Wallet2: {:?}", wallet2);
+        // spend
 
-		let receive_key = wallet2.request(Some(token_id))?;
-		let _ = client.act_wallet_save(&wallet2, &sk2, &with_wallet).await?;
-		let mut wallet2 = client.act_wallet_get(&sk2).await?.expect("Wallet2 expected in storage");
-		println!("Wallet2: {:?}", wallet2);
+        let receive_amount = amount(200, DECIMALS);
 
-		// spend
+        let issuer_sk = sk1.derive_child(
+            &wallet1
+                .index_of_token(token_id)
+                .ok_or("Token id not found".to_string())?
+                .to_be_bytes::<32>(),
+        );
 
-		let receive_amount = amount(200, DECIMALS);
+        let (inputs, sum, rest_key) = wallet1.take_to_spend(token_id)?;
+        println!("Inputs: {:?}", (&inputs, sum));
+        println!("Wallet1: {:?}", wallet1);
 
-		let issuer_sk = sk1.derive_child(
-			&wallet1.index_of_token(token_id)
-				.ok_or("Token id not found".to_string())?
-				.to_be_bytes::<32>()
-		);
+        let rest_amount = sum
+            .checked_sub(receive_amount)
+            .ok_or("Overflow".to_string())?;
 
-		let (inputs, sum, rest_key) = wallet1.take_to_spend(token_id)?;
-		println!("Inputs: {:?}", (&inputs, sum));
-		println!("Wallet1: {:?}", wallet1);
+        let spend = GraphEntry::new(
+            &issuer_sk,
+            inputs,
+            token_id.0,
+            vec![
+                (receive_key, receive_amount.to_be_bytes()),
+                (rest_key, rest_amount.to_be_bytes()),
+            ], // all output to issuer
+        );
+        let (_paid, spend_address) = client
+            .graph_entry_put(spend, with_wallet.clone())
+            .await
+            .map_err(|e| format!("{}", e))?;
 
-		let rest_amount = sum.checked_sub(receive_amount)
-			.ok_or("Overflow".to_string())?;
+        println!("Spend GraphEntry: {}", spend_address);
+        assert_eq!(&issuer_key, spend_address.owner());
 
-		let spend = GraphEntry::new(
-			&issuer_sk,
-			inputs,
-			token_id.0,
-			vec![
-				(receive_key, receive_amount.to_be_bytes()),
-				(rest_key, rest_amount.to_be_bytes())
-			] // all output to issuer
-		);
-		let (_paid, spend_address) = client.graph_entry_put(spend, with_wallet.clone()).await
-			.map_err(|e| format!("{}", e))?;
+        wallet1.receive(rest_amount, token_id, *spend_address.owner())?;
+        let _ = client.act_wallet_save(&wallet1, &sk1, &with_wallet).await?;
+        let wallet1 = client
+            .act_wallet_get(&sk1)
+            .await?
+            .expect("Wallet1 expected in storage");
+        println!("Wallet1: {:?}", wallet1);
 
-		println!("Spend GraphEntry: {}", spend_address);
-		assert_eq!(&issuer_key, spend_address.owner());
+        wallet2.receive(receive_amount, token_id, *spend_address.owner())?;
+        let _ = client.act_wallet_save(&wallet2, &sk2, &with_wallet).await?;
+        let wallet2 = client
+            .act_wallet_get(&sk2)
+            .await?
+            .expect("Wallet2 expected in storage");
+        println!("Wallet2: {:?}", wallet2);
 
-		wallet1.receive(rest_amount, token_id, *spend_address.owner())?;
-		let _ = client.act_wallet_save(&wallet1, &sk1, &with_wallet).await?;
-		let wallet1 = client.act_wallet_get(&sk1).await?.expect("Wallet1 expected in storage");
-		println!("Wallet1: {:?}", wallet1);
+        Ok(())
+    }
 
-		wallet2.receive(receive_amount, token_id, *spend_address.owner())?;
-		let _ = client.act_wallet_save(&wallet2, &sk2, &with_wallet).await?;
-		let wallet2 = client.act_wallet_get(&sk2).await?.expect("Wallet2 expected in storage");
-		println!("Wallet2: {:?}", wallet2);
+    // TODO: de/serialze wallet
 
-		Ok(())
-	}
+    #[test]
+    fn pk_cannot_be_arbitrary_32bytes() -> Result<(), String> {
+        // EVM txid
+        let pubkey =
+            PublicKey::from_hex("91c680f29bb12c72093642aa6750332e140753bd112097e021428d86b12ee479");
+        assert!(pubkey.is_err());
 
-	// TODO: de/serialze wallet
+        // EVM address, 20 bytes
+        let pubkey = PublicKey::from_hex("a78d8321b20c4ef90ecd72f2588aa985a4bdb684");
+        assert!(pubkey.is_err());
 
-	#[test]
-	fn pk_cannot_be_arbitrary_32bytes() -> Result<(), String> {
-		// EVM txid
-		let pubkey = PublicKey::from_hex("91c680f29bb12c72093642aa6750332e140753bd112097e021428d86b12ee479");
-		assert!(pubkey.is_err());
+        // 32 bytes
+        let pubkey =
+            PublicKey::from_hex("a78d8321b20c4ef90ecd72f2588aa985a4bdb684000000000000000000000000");
+        assert!(pubkey.is_err());
 
-		// EVM address, 20 bytes
-		let pubkey = PublicKey::from_hex("a78d8321b20c4ef90ecd72f2588aa985a4bdb684");
-		assert!(pubkey.is_err());
+        Ok(())
+    }
 
-		// 32 bytes
-		let pubkey = PublicKey::from_hex("a78d8321b20c4ef90ecd72f2588aa985a4bdb684000000000000000000000000");
-		assert!(pubkey.is_err());
+    #[test]
+    fn pubkey_from_derived_sk_equals_derived_pubkey() {
+        let index = "index1_abcdef";
+        println!("index: {:?}", index);
+        let sk = SecretKey::random();
+        println!("sk: {:?}", sk);
+        let pk = sk.public_key();
+        println!("pk: {:?}", pk);
 
-		Ok(())
-	}
+        let pubkey_from_derived_sk = sk.derive_child(index.as_bytes()).public_key();
+        println!("pubkey_from_derived_sk: {:?}", pubkey_from_derived_sk);
+        let derived_pubkey = pk.derive_child(index.as_bytes());
+        println!("derived_pubkey: {:?}", derived_pubkey);
 
-	#[test]
-	fn pubkey_from_derived_sk_equals_derived_pubkey() {
-		let index = "index1_abcdef";
-		println!("index: {:?}", index);
-		let sk = SecretKey::random();
-		println!("sk: {:?}", sk);
-		let pk = sk.public_key();
-		println!("pk: {:?}", pk);
-
-		let pubkey_from_derived_sk = sk.derive_child(index.as_bytes()).public_key();
-		println!("pubkey_from_derived_sk: {:?}", pubkey_from_derived_sk);
-		let derived_pubkey = pk.derive_child(index.as_bytes());
-		println!("derived_pubkey: {:?}", derived_pubkey);
-
-		assert_eq!(pubkey_from_derived_sk, derived_pubkey);
-	}
-
+        assert_eq!(pubkey_from_derived_sk, derived_pubkey);
+    }
 }
