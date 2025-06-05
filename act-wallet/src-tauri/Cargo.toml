@@ -28,5 +28,4 @@ serde_json = "1"
 sn_bls_ckd = "0.2"
 sn_curv = { version = "0.10", default-features = false, features = ["num-bigint"] }
 autonomi = "0.4.6"
-ant-act = { version = "0.0.1", path = "../../token" }
-#ant-act = { version = "0.0.1", git = "ssh://git@github.com/safenetforum-community/community-token.git" }
+ant-act = "0.0.1"
