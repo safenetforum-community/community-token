@@ -2,6 +2,11 @@
 name = "ant-act"
 version = "0.0.1"
 description = "Autonomi Community Token"
+authors = ["loziniak"]
+license-file = "../LICENSE"
+repository = "https://github.com/safenetforum-community/community-token"
+keywords = ["autonomi", "p2p", "token", "cryptocurrency", "erc20"]
+categories = ["cryptography::cryptocurrencies"]
 edition = "2021"
 
 [dependencies]
@@ -18,5 +23,5 @@ rmp-serde = "1.3"
 [dev-dependencies]
 tokio = "1"
 hex = "0.4"
-tracing = "*"
-ant-logging = "*"
+tracing = "0.1"
+ant-logging = "0.2"

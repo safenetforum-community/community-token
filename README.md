@@ -8,6 +8,8 @@
 
 ### [Token design](token/docs/token.md)
 
+### [Wallet app Run](act-wallet/README.md)
+
 ### [Proposal @Autonomi Forum](https://forum.autonomi.community/t/community-token-proposal/41585)
 
 * Proposal announcement
