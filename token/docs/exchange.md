@@ -72,3 +72,8 @@ Exchange GE1 is valid if:
 * Their sum is equal sum of second and subsequent outputs
 * (rest of the rules are the same as in standard GE validation)
 
+## Diagram
+
+[source](ACT Exchange.drawio)
+
+![ACT Exchange Diagram](ACT Exchange.drawio.png)
