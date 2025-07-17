@@ -282,7 +282,7 @@ async fn receive(
     let token_id = XorName(spend.content);
     let pk = act_wallet
         .pk_of_token(token_id)
-        .ok_or("Payment has not been reqested".to_string())?;
+        .ok_or("Payment has not been requested".to_string())?;
     println!("Receive pk: {:.4}(...)", pk.to_hex());
 
     let (amount, overflow, empty) = spend
