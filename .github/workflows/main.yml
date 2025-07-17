@@ -66,7 +66,7 @@ jobs:
           projectPath: "act-wallet/"
           tagName: release-v__VERSION__ # the action automatically replaces \_\_VERSION\_\_ with the app version.
           releaseName: "ACT Wallet alpha v__VERSION__"
-          releaseBody: "Autonomi Community Token Wallet App (alpha). Initial test release."
+          releaseBody: "Autonomi Community Token Wallet App (alpha). Changelog: * (chore) update autonomi to 0.5.1"
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}
