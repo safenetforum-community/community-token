@@ -1,7 +1,5 @@
-use ant_networking::{GetRecordError, NetworkError};
 use autonomi::{
-    client::payment::PaymentOption, scratchpad::ScratchpadError, Bytes, Client, PublicKey,
-    ScratchpadAddress, SecretKey, XorName,
+    client::payment::PaymentOption, Bytes, Client, PublicKey, ScratchpadAddress, SecretKey, XorName,
 };
 use futures::Future;
 use ruint::aliases::U256;
@@ -219,16 +217,24 @@ pub trait WalletExt {
 
 impl WalletExt for Client {
     async fn act_wallet_get(&self, sk: &SecretKey) -> Result<Option<Wallet>, String> {
-        match self.scratchpad_get(&ScratchpadAddress::new(sk.public_key())).await {
-			Ok(sp) => {
-				let bytes = sp.decrypt_data(sk).map_err(|e| format!("{e}"))?;
-				let wallet = rmp_serde::from_slice(&bytes).map_err(|e| format!("{e}"))?;
-				Ok(Some(wallet))
-			},
-			Err(ScratchpadError::Network(NetworkError::GetRecordError(GetRecordError::RecordNotFound))) // workaround for https://github.com/maidsafe/autonomi/pull/2999
-					| Err(ScratchpadError::Missing) => Ok(None),
-			Err(e) => Err(format!("{e}")),
-		}
+        let address = ScratchpadAddress::new(sk.public_key());
+
+        if !self
+            .scratchpad_check_existence(&address)
+            .await
+            .map_err(|e| format!("{e}"))?
+        {
+            return Ok(None);
+        }
+
+        match self.scratchpad_get(&address).await {
+            Ok(sp) => {
+                let bytes = sp.decrypt_data(sk).map_err(|e| format!("{e}"))?;
+                let wallet = rmp_serde::from_slice(&bytes).map_err(|e| format!("{e}"))?;
+                Ok(Some(wallet))
+            }
+            Err(e) => Err(format!("{e}")),
+        }
     }
 
     async fn act_wallet_save(
