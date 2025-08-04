@@ -810,6 +810,8 @@ dependencies = [
 [[package]]
 name = "ant-act"
 version = "0.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e54b9a224f8388c063302bbfcb71b8857b7faea68e7d14cfd4a06a4943b52a69"
 dependencies = [
  "autonomi",
  "futures",
