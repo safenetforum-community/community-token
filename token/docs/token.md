@@ -54,8 +54,8 @@ Validation
 * Parent's Genesis GE is equal children's Genesis GE
 * Graph acyclicity (TODO: check with theory/proofs)
   * Keep list/hashset of visited GEs, check that they are not visited twice
-* Sum of inputs = sum of outputs 
-* Genesis transaction
+* Sum of inputs >= sum of outputs
+* Genesis transaction is valid
 
 If an invalid transaction is detected during validation of an incoming transaction (someone sent us money), such transaction could be rejected by putting a "burn" GrephEntry (one with empty *outputs*) or publishing a marker.
 
