@@ -28,4 +28,4 @@ serde_json = "1"
 sn_bls_ckd = "0.2"
 sn_curv = { version = "0.10", default-features = false, features = ["num-bigint"] }
 autonomi = { version = "0.5.3", git = "https://github.com/loziniak/safe_network.git", branch = "scratchpad-dedup-pr3136" }
-ant-act = "0.0.3-1"
+ant-act = "=0.0.3-1"
