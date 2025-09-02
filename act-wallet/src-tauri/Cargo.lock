@@ -4,7 +4,7 @@ version = 4
 
 [[package]]
 name = "act-wallet"
-version = "0.0.3"
+version = "0.0.3-1"
 dependencies = [
  "ant-act",
  "autonomi",
@@ -809,7 +809,7 @@ dependencies = [
 
 [[package]]
 name = "ant-act"
-version = "0.0.3"
+version = "0.0.3-1"
 dependencies = [
  "autonomi",
  "futures",
@@ -824,8 +824,7 @@ dependencies = [
 [[package]]
 name = "ant-bootstrap"
 version = "0.2.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f4ed5140085019946037c3e8bbf3fcd51e6437178b2fb699bf3c8f8242e41f7d"
+source = "git+https://github.com/loziniak/safe_network.git?branch=scratchpad-dedup-pr3136#255fe72c770de649b48b13fbfc8ff8cebb22fb37"
 dependencies = [
  "ant-logging",
  "ant-protocol",
@@ -848,8 +847,7 @@ dependencies = [
 [[package]]
 name = "ant-build-info"
 version = "0.1.29"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2b6954a9d1c42c19ff90fd59ace0e89e966b06d901d45a5a7f0e66a37b083e2b"
+source = "git+https://github.com/loziniak/safe_network.git?branch=scratchpad-dedup-pr3136#255fe72c770de649b48b13fbfc8ff8cebb22fb37"
 dependencies = [
  "chrono",
  "tracing",
@@ -859,8 +857,7 @@ dependencies = [
 [[package]]
 name = "ant-evm"
 version = "0.1.16"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b2fe607c062ec9bd656a88acb7eeb5ef952b59f35b808bdfa82a3c80e6ad26bb"
+source = "git+https://github.com/loziniak/safe_network.git?branch=scratchpad-dedup-pr3136#255fe72c770de649b48b13fbfc8ff8cebb22fb37"
 dependencies = [
  "custom_debug",
  "evmlib",
@@ -881,8 +878,7 @@ dependencies = [
 [[package]]
 name = "ant-logging"
 version = "0.2.51"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "80628b556de5dc3f842e1da49d246393f172053a90392e30343fc92ef480746d"
+source = "git+https://github.com/loziniak/safe_network.git?branch=scratchpad-dedup-pr3136#255fe72c770de649b48b13fbfc8ff8cebb22fb37"
 dependencies = [
  "chrono",
  "dirs-next",
@@ -899,8 +895,7 @@ dependencies = [
 [[package]]
 name = "ant-protocol"
 version = "1.0.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "07352d2914813e71f501dfb9d537d35afb4ca65243079d293d93ae06f6e83552"
+source = "git+https://github.com/loziniak/safe_network.git?branch=scratchpad-dedup-pr3136#255fe72c770de649b48b13fbfc8ff8cebb22fb37"
 dependencies = [
  "ant-build-info",
  "ant-evm",
@@ -1356,8 +1351,7 @@ checksum = "c08606f8c3cbf4ce6ec8e28fb0014a2c086708fe954eaa885384a6165172e7e8"
 [[package]]
 name = "autonomi"
 version = "0.5.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "783fc03784402efbad210c02dfc9c886010e3b7a9e3bacc451451c72c276b990"
+source = "git+https://github.com/loziniak/safe_network.git?branch=scratchpad-dedup-pr3136#255fe72c770de649b48b13fbfc8ff8cebb22fb37"
 dependencies = [
  "ant-bootstrap",
  "ant-evm",
@@ -2970,8 +2964,7 @@ dependencies = [
 [[package]]
 name = "evmlib"
 version = "0.4.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "49f12d59ec24964fdec7c5a7a9a7439044a4e11d0f886c71d72d448fc2791605"
+source = "git+https://github.com/loziniak/safe_network.git?branch=scratchpad-dedup-pr3136#255fe72c770de649b48b13fbfc8ff8cebb22fb37"
 dependencies = [
  "alloy",
  "dirs-next",
